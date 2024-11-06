@@ -1,0 +1,47 @@
+# Compiled Object Files
+*.o
+
+# Executable Files
+SDL2VulkanGame
+SDL2VulkanGame.exe
+
+# Build Directories
+/build/
+obj/
+
+# Visual Studio files
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+
+# CMake Cache and Configuration Files (if used)
+CMakeCache.txt
+CMakeFiles/
+Makefile
+
+# Log files
+*.log
+
+# SDL2 related files
+*.so
+*.dll
+*.dylib
+*.a
+
+# Shader Files (SPIR-V compiled)
+*.spv
+
+# Backup Files
+*~
+*.bak
+
+# IDE specific files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Other
+.DS_Store
+Thumbs.db
