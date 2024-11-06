@@ -39,6 +39,7 @@ Makefile
 # IDE specific files
 .vscode/
 .idea/
+.vs/
 *.sublime-project
 *.sublime-workspace
 
