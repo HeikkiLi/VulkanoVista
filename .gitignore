@@ -9,6 +9,22 @@ SDL2VulkanGame.exe
 /build/
 obj/
 
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
 # Visual Studio files
 *.sln
 *.vcxproj
@@ -18,7 +34,6 @@ obj/
 # CMake Cache and Configuration Files (if used)
 CMakeCache.txt
 CMakeFiles/
-Makefile
 
 # Log files
 *.log
@@ -46,3 +61,5 @@ Makefile
 # Other
 .DS_Store
 Thumbs.db
+
+external/
