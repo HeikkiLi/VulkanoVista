@@ -34,7 +34,6 @@ bld/
 # CMake Cache and Configuration Files (if used)
 CMakeCache.txt
 CMakeFiles/
-Makefile
 
 # Log files
 *.log
