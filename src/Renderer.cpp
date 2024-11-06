@@ -26,14 +26,26 @@ void Renderer::setup(const Device& device, const Swapchain& swapchain)
 // Acquire image from swapchain, record command buffer, submit, and present
 void Renderer::drawFrame()
 {
-    // Acquire an image from the swapchain
     vkWaitForFences(device->getLogicalDevice(), 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
     vkResetFences(device->getLogicalDevice(), 1, &inFlightFences[currentFrame]);
 
+    // Acquire an image from the swapchain
     uint32_t imageIndex;
-    vkAcquireNextImageKHR(device->getLogicalDevice(), swapchain->getSwapchain(), UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+    VkResult result = vkAcquireNextImageKHR(device->getLogicalDevice(), swapchain->getSwapchain(), UINT64_MAX,
+        imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        recreateSwapchain();  // If the swapchain is outdated, recreate it.
+        return;
+    }
+    else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+        throw std::runtime_error("Failed to acquire swap chain image!");
+    }
 
-    // Record and submit commands to render
+    // Record commands to command buffer (for this specific image)
+    vkResetCommandBuffer(commandBuffers[imageIndex], 0);
+    recordCommandBuffer(commandBuffers[imageIndex], imageIndex);
+
+    // Set up submit info for queue submission
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
@@ -66,11 +78,103 @@ void Renderer::drawFrame()
     presentInfo.pSwapchains = swapchains;
     presentInfo.pImageIndices = &imageIndex;
 
-    vkQueuePresentKHR(device->getPresentQueue(), &presentInfo);
+    result = vkQueuePresentKHR(device->getPresentQueue(), &presentInfo);
 
-    // Move to the next frame
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        recreateSwapchain();
+    }
+    else if (result != VK_SUCCESS) {
+        throw std::runtime_error("Failed to present swap chain image!");
+    }
+
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
+
+void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+
+    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to begin recording command buffer!");
+    }
+
+    VkRenderPassBeginInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass = renderPass;
+    renderPassInfo.framebuffer = framebuffers[imageIndex];
+    renderPassInfo.renderArea.offset = { 0, 0 };
+    renderPassInfo.renderArea.extent = swapchain->getExtent();
+
+    VkClearValue clearColor = { {0.0f, 0.0f, 0.0f, 1.0f} };
+    renderPassInfo.clearValueCount = 1;
+    renderPassInfo.pClearValues = &clearColor;
+
+    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+    // You would add vkCmdDraw or other draw commands here
+    vkCmdDraw(commandBuffer, 3, 1, 0, 0); // Example draw call
+
+    vkCmdEndRenderPass(commandBuffer);
+
+    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to record command buffer!");
+    }
+}
+
+void Renderer::recreateSwapchain() {
+    // Wait until the device is idle
+    vkDeviceWaitIdle(device->getLogicalDevice());
+
+    // Cleanup swapchain-related resources
+    cleanupSwapchain();
+
+    // Recreate swapchain and associated resources
+    swapchain->create(device, windowExtent);
+    createRenderPass();
+    createGraphicsPipeline();
+    createFramebuffers();
+    createCommandBuffers();
+}
+
+void Renderer::cleanupSwapchain() {
+    // Destroy framebuffers for each swapchain image view
+    for (auto framebuffer : framebuffers) {
+        vkDestroyFramebuffer(device->getLogicalDevice(), framebuffer, nullptr);
+    }
+    framebuffers.clear();
+
+    // Destroy the graphics pipeline and pipeline layout, as they may depend on swapchain format or extent
+    if (graphicsPipeline != VK_NULL_HANDLE) {
+        vkDestroyPipeline(device->getLogicalDevice(), graphicsPipeline, nullptr);
+        graphicsPipeline = VK_NULL_HANDLE;
+    }
+
+    if (pipelineLayout != VK_NULL_HANDLE) {
+        vkDestroyPipelineLayout(device->getLogicalDevice(), pipelineLayout, nullptr);
+        pipelineLayout = VK_NULL_HANDLE;
+    }
+
+    // Destroy render pass
+    if (renderPass != VK_NULL_HANDLE) {
+        vkDestroyRenderPass(device->getLogicalDevice(), renderPass, nullptr);
+        renderPass = VK_NULL_HANDLE;
+    }
+
+    // Free command buffers, as they are tied to the old swapchain images
+    if (!commandBuffers.empty()) {
+        vkFreeCommandBuffers(device->getLogicalDevice(), commandPool, static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
+        commandBuffers.clear();
+    }
+
+    // Call the swapchain’s own cleanup function to destroy swapchain and associated image views
+    if (swapchain != nullptr) {
+        swapchain->cleanup();
+    }
+}
+
 
 // Create the render pass
 void Renderer::createRenderPass() {
