@@ -32,6 +32,7 @@ class Device
 {
 public:
     void pickPhysicalDevice(const Instance& instance, VkSurfaceKHR surface);
+    VkPhysicalDevice getPhysicalDevice() const;
     void createLogicalDevice(VkSurfaceKHR surface);
     VkDevice getLogicalDevice() const;
     uint32_t getGraphicsQueueFamilyIndex() const;
@@ -39,7 +40,12 @@ public:
     VkQueue getPresentQueue() const;
     void cleanup();
     void waitIdle();
+    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface);
 
+    std::vector<VkSurfaceFormatKHR> getSurfaceFormats(VkSurfaceKHR surface) const;
+    std::vector<VkPresentModeKHR> getPresentModes(VkSurfaceKHR surface) const;
+    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+    
 private:
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
     VkDevice device;
@@ -51,8 +57,9 @@ private:
         VK_KHR_SWAPCHAIN_EXTENSION_NAME  // Required for swapchain creation
     };
 
-    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface);
     bool isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface);
+    bool isSwapchainExtensionSupported(VkPhysicalDevice physicalDevice);
     bool checkDeviceExtensionSupport(VkPhysicalDevice device);
     SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface);
+    bool  findGraphicsAndPresentQueueFamilies(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, uint32_t& graphicsQueueFamilyIndex, uint32_t& presentQueueFamilyIndex);
 };

@@ -61,3 +61,5 @@ CMakeFiles/
 # Other
 .DS_Store
 Thumbs.db
+
+external/

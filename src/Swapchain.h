@@ -8,16 +8,16 @@
 class Swapchain
 {
 public:
-    void create(const Device& device, VkSurfaceKHR surface, int width, int height);
+    void create(Device* device, VkSurfaceKHR surface, VkExtent2D extent);
     void cleanup();
 
     VkSwapchainKHR getSwapchain() const { return swapchain; }
     VkFormat getImageFormat() const { return imageFormat; }
     VkExtent2D getExtent() const { return extent; }
-    const std::vector<VkImageView>& getImageViews() const { return imageViews; }
+    const std::vector<VkImageView>& getImageViews() const { return swapchainImageViews; }
 
-    uint32_t getImageCount() const;            // Returns the number of images in the swapchain
-    VkImageView getImageView(size_t index) const; // Returns the image view at a specified index
+    uint32_t getImageCount() const;                 // Returns the number of images in the swapchain
+    VkImageView getImageView(size_t index) const;   // Returns the image view at a specified index
 
 private:
     // Helper functions for configuring the swapchain
@@ -29,8 +29,8 @@ private:
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
     VkFormat imageFormat;                   // Format of swapchain images
     VkExtent2D extent;                      // Dimensions of swapchain images
-    std::vector<VkImage> images;            // Images in the swapchain
-    std::vector<VkImageView> imageViews;    // Image views for each swapchain image
+    std::vector<VkImage> swapchainImages;            // Images in the swapchain
+    std::vector<VkImageView> swapchainImageViews;    // Image views for each swapchain image
 
     // Reference to the logical device (for cleanup, etc.)
     const Device* device = nullptr;

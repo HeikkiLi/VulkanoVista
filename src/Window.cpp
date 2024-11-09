@@ -5,7 +5,7 @@
 
 Window::~Window()
 {
-    SDL_DestroyWindow(window);
+    SDL_DestroyWindow(sdlWindow);
     SDL_Quit();
 }
 
@@ -20,9 +20,9 @@ void Window::create(int width, int height, const std::string& title)
     }
 
     // Create SDL window
-    window = SDL_CreateWindow(title.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+    sdlWindow = SDL_CreateWindow(title.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         width, height, SDL_WINDOW_VULKAN);
-    if (!window) {
+    if (!sdlWindow) {
         Logger::error("Failed to create SDL window: " + std::string(SDL_GetError()));
         throw std::runtime_error("Failed to create SDL window");
     }
@@ -32,7 +32,7 @@ void Window::create(int width, int height, const std::string& title)
 
 void Window::createSurface(const Instance& instance) 
 {
-    if (!SDL_Vulkan_CreateSurface(window, instance.getInstance(), &surface)) {
+    if (!SDL_Vulkan_CreateSurface(sdlWindow, instance.getInstance(), &surface)) {
         throw std::runtime_error("Failed to create Vulkan surface!");
     }
 }
@@ -57,8 +57,15 @@ VkSurfaceKHR Window::getSurface() const
     return surface;
 }
 
+VkExtent2D Window::getExtent() const
+{
+    int width, height;
+    SDL_GetWindowSize(sdlWindow, &width, &height);
+    return { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
+}
+
 void Window::cleanup() 
 {
-    SDL_DestroyWindow(window);
+    SDL_DestroyWindow(sdlWindow);
     SDL_Quit();
 }

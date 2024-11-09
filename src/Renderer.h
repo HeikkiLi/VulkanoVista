@@ -4,14 +4,27 @@
 
 #include "Device.h"
 #include "Swapchain.h"
+#include "Window.h"
+
+#include "Vertex.h"
+
+std::vector<Vertex> vertices = {
+    {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},  // Bottom vertex (red)
+    {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},   // Right vertex (green)
+    {{-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}},  // Left vertex (blue)
+};
 
 class Renderer
 {
 public:
     ~Renderer();
-    void setup(const Device& device, const Swapchain& swapchain);
+    void setup(Device* device, Swapchain* swapchain, Window* window);
     void drawFrame();
     void cleanup();
+    
+    void recreateSwapchain(VkExtent2D newExtent);
+    VkBuffer createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkDeviceMemory& bufferMemory);
+    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
 private:
     void createRenderPass();
@@ -22,15 +35,17 @@ private:
     void createSyncObjects();
     
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
-    void recreateSwapchain();
+    
     void cleanupSwapchain();
 
     VkPipelineShaderStageCreateInfo createShaderStage(const std::string& filepath, VkShaderStageFlagBits stage);
 
+    void createVertexBuffer();
 
     // Reference to external objects (set in setup)
     Device* device = nullptr;       // Pointer to Device for easy access
     Swapchain* swapchain = nullptr; // Pointer to Swapchain for easy access
+    Window* window = nullptr;
 
     // Vulkan resources
     VkRenderPass renderPass = VK_NULL_HANDLE;
@@ -53,4 +68,8 @@ private:
     uint32_t currentFrame = 0;  // Tracks the current frame in flight
 
     std::vector<VkShaderModule> shaderModules; // To store created shader modules
+
+    // Vertex buffer
+    VkBuffer vertexBuffer;
+    VkDeviceMemory vertexBufferMemory;
 };

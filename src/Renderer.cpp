@@ -9,10 +9,11 @@ Renderer::~Renderer()
     cleanup();
 }
 
-void Renderer::setup(const Device& device, const Swapchain& swapchain)
+void Renderer::setup(Device* device,  Swapchain* swapchain, Window* window)
 {
-    this->device = &device;         // Store pointer to Device
-    this->swapchain = &swapchain;   // Store pointer to Swapchain
+    this->device = device;         // Store pointer to Device
+    this->swapchain = swapchain;   // Store pointer to Swapchain
+    this->window = window;
 
     createRenderPass();
     createGraphicsPipeline();
@@ -34,7 +35,7 @@ void Renderer::drawFrame()
     VkResult result = vkAcquireNextImageKHR(device->getLogicalDevice(), swapchain->getSwapchain(), UINT64_MAX,
         imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        recreateSwapchain();  // If the swapchain is outdated, recreate it.
+        recreateSwapchain(window->getExtent());  // If the swapchain is outdated, recreate it.
         return;
     }
     else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
@@ -81,7 +82,7 @@ void Renderer::drawFrame()
     result = vkQueuePresentKHR(device->getPresentQueue(), &presentInfo);
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-        recreateSwapchain();
+        recreateSwapchain(window->getExtent());
     }
     else if (result != VK_SUCCESS) {
         throw std::runtime_error("Failed to present swap chain image!");
@@ -114,8 +115,13 @@ void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-    // You would add vkCmdDraw or other draw commands here
-    vkCmdDraw(commandBuffer, 3, 1, 0, 0); // Example draw call
+    // Bind the vertex buffer
+    VkBuffer vertexBuffers[] = { vertexBuffer };
+    VkDeviceSize offsets[] = { 0 };
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
+    // Issue the draw command
+    vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
 
     vkCmdEndRenderPass(commandBuffer);
 
@@ -124,20 +130,102 @@ void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
     }
 }
 
-void Renderer::recreateSwapchain() {
+void Renderer::recreateSwapchain(VkExtent2D windowExtent) {
     // Wait until the device is idle
     vkDeviceWaitIdle(device->getLogicalDevice());
-
     // Cleanup swapchain-related resources
     cleanupSwapchain();
 
-    // Recreate swapchain and associated resources
-    swapchain->create(device, windowExtent);
+    // Recreate swapchain with the updated extent
+    swapchain->create(device, window->getSurface(), windowExtent);
     createRenderPass();
     createGraphicsPipeline();
     createFramebuffers();
     createCommandBuffers();
 }
+
+VkBuffer Renderer::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkDeviceMemory& bufferMemory) {
+    VkBuffer buffer;
+
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = size;
+    bufferInfo.usage = usage;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateBuffer(device->getLogicalDevice(), &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create buffer!");
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(device->getLogicalDevice(), buffer, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = device->findMemoryType(memRequirements.memoryTypeBits, properties);
+
+    if (vkAllocateMemory(device->getLogicalDevice(), &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate buffer memory!");
+    }
+
+    vkBindBufferMemory(device->getLogicalDevice(), buffer, bufferMemory, 0);
+
+    return buffer;
+}
+
+
+void Renderer::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
+    // Allocate a temporary command buffer for the copy operation
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = commandPool; 
+    allocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer commandBuffer;
+    if (vkAllocateCommandBuffers(device->getLogicalDevice(), &allocInfo, &commandBuffer) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate command buffer!");
+    }
+
+    // Begin recording the command buffer
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to begin command buffer!");
+    }
+
+    // Copy data from the source buffer to the destination buffer
+    VkBufferCopy copyRegion{};
+    copyRegion.srcOffset = 0; // Optional
+    copyRegion.dstOffset = 0; // Optional
+    copyRegion.size = size;
+    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+    // End recording the command buffer
+    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to record command buffer!");
+    }
+
+    // Submit the command buffer to the graphics queue
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+
+    if (vkQueueSubmit(device->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to submit copy command buffer!");
+    }
+
+    vkQueueWaitIdle(device->getGraphicsQueue()); // Wait for the copy operation to complete
+
+    // Clean up: Free the temporary command buffer
+    vkFreeCommandBuffers(device->getLogicalDevice(), commandPool, 1, &commandBuffer);
+}
+
+
 
 void Renderer::cleanupSwapchain() {
     // Destroy framebuffers for each swapchain image view
@@ -223,8 +311,13 @@ void Renderer::createGraphicsPipeline() {
     // Vertex input state
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexBindingDescriptionCount = 0; // Set to 1 if you have vertex data
-    vertexInputInfo.vertexAttributeDescriptionCount = 0; // Set to 1 if you have vertex data
+    std::vector<VkVertexInputBindingDescription> bindingDescriptions = Vertex::getBindingDescriptions();
+    std::vector<VkVertexInputAttributeDescription> attributeDescriptions = Vertex::getAttributeDescriptions();
+
+    vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDescriptions.size());
+    vertexInputInfo.pVertexBindingDescriptions = bindingDescriptions.data();
+    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
     // Input assembly state
     VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
@@ -260,7 +353,7 @@ void Renderer::createGraphicsPipeline() {
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
     rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
 
     // Multisample state
@@ -308,7 +401,9 @@ void Renderer::createGraphicsPipeline() {
     pipelineInfo.renderPass = renderPass; // Ensure renderPass is created and not null
     pipelineInfo.subpass = 0;
 
-    if (vkCreateGraphicsPipelines(device->getLogicalDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+    VkResult result = vkCreateGraphicsPipelines(device->getLogicalDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline);
+    if (result != VK_SUCCESS) {
+        std::cerr << "Failed to create graphics pipeline! Error code: " << result << std::endl;
         throw std::runtime_error("Failed to create graphics pipeline!");
     }
 }
@@ -419,6 +514,31 @@ VkPipelineShaderStageCreateInfo Renderer::createShaderStage(const std::string& f
     return shaderStageInfo; // Return the created shader stage info
 }
 
+void Renderer::createVertexBuffer() {
+    VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    stagingBuffer = createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBufferMemory);
+
+    // Map and copy vertex data to staging buffer
+    void* data;
+    vkMapMemory(device->getLogicalDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
+    memcpy(data, vertices.data(), (size_t)bufferSize);
+    vkUnmapMemory(device->getLogicalDevice(), stagingBufferMemory);
+
+    // Create the actual vertex buffer with the VK_BUFFER_USAGE_VERTEX_BUFFER_BIT usage
+    vertexBuffer = createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBufferMemory);
+
+    // Copy data from staging buffer to vertex buffer
+    copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+
+    // Clean up staging buffer
+    vkDestroyBuffer(device->getLogicalDevice(), stagingBuffer, nullptr);
+    vkFreeMemory(device->getLogicalDevice(), stagingBufferMemory, nullptr);
+}
+
+
 void Renderer::cleanup() {
     for (auto shaderModule : shaderModules) {
         vkDestroyShaderModule(device->getLogicalDevice(), shaderModule, nullptr);
@@ -440,4 +560,7 @@ void Renderer::cleanup() {
     }
 
     vkDestroyCommandPool(device->getLogicalDevice(), commandPool, nullptr);
+
+    vkDestroyBuffer(device->getLogicalDevice(), vertexBuffer, nullptr);
+    vkFreeMemory(device->getLogicalDevice(), vertexBufferMemory, nullptr);
 }

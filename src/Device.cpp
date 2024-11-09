@@ -1,4 +1,5 @@
 #include "Device.h"
+#include "Logger.h"
 
 
 void Device::pickPhysicalDevice(const Instance& instance, VkSurfaceKHR surface) 
@@ -19,14 +20,14 @@ void Device::pickPhysicalDevice(const Instance& instance, VkSurfaceKHR surface)
         VkPhysicalDeviceProperties deviceProperties;
         vkGetPhysicalDeviceProperties(device, &deviceProperties);
 
-        std::cout << "Device Name: " << deviceProperties.deviceName << std::endl;
-        std::cout << "Device Type: " << deviceProperties.deviceType << std::endl;
+        Logger::info("Device Name: " + std::string(deviceProperties.deviceName));
+        Logger::info("Device Type: " + std::to_string(static_cast<int>(deviceProperties.deviceType)));
 
         if (isDeviceSuitable(device, surface)) 
         {
             physicalDevice = device;
-            std::cout << "Selected Device: " << deviceProperties.deviceName << std::endl;
-            graphicsQueueFamilyIndex = findQueueFamilies(device, surface).graphicsFamily.value();
+            Logger::info("Selected Device : " + std::string(deviceProperties.deviceName));
+            graphicsQueueFamilyIndex = findQueueFamilies(physicalDevice, surface).graphicsFamily.value();
             break;
         }
     }
@@ -35,6 +36,11 @@ void Device::pickPhysicalDevice(const Instance& instance, VkSurfaceKHR surface)
     {
         throw std::runtime_error("Failed to find a suitable GPU!");
     }
+}
+
+VkPhysicalDevice Device::getPhysicalDevice() const
+{
+    return physicalDevice;
 }
 
 bool Device::isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface)
@@ -145,41 +151,101 @@ SwapChainSupportDetails Device::querySwapChainSupport(VkPhysicalDevice device, V
 }
 
 
+bool Device::isSwapchainExtensionSupported(VkPhysicalDevice physicalDevice) {
+    uint32_t extensionCount = 0;
+    vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, nullptr);
+
+    std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+    vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, availableExtensions.data());
+
+    for (const auto& extension : availableExtensions) {
+        if (strcmp(extension.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0) {
+            return true; // Found the VK_KHR_SWAPCHAIN extension
+        }
+    }
+    return false; // Extension not found
+}
+
+bool  Device::findGraphicsAndPresentQueueFamilies(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, uint32_t& graphicsQueueFamilyIndex, uint32_t& presentQueueFamilyIndex) {
+    uint32_t queueFamilyCount = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
+
+    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
+
+    for (uint32_t i = 0; i < queueFamilyCount; ++i) {
+        if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+            graphicsQueueFamilyIndex = i;
+
+            VkBool32 presentSupport = VK_FALSE;
+            VkResult result = vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &presentSupport);
+            if (result != VK_SUCCESS) {
+                std::cerr << "Failed to check surface support for queue family!" << std::endl;
+                return false;
+            }
+
+            if (presentSupport == VK_TRUE) {
+                presentQueueFamilyIndex = i;
+                return true; // Found a queue family that supports both graphics and presentation
+            }
+        }
+    }
+
+    return false; // No suitable queue family found
+}
+
 void Device::createLogicalDevice(VkSurfaceKHR surface)
 {
-    VkDeviceCreateInfo deviceCreateInfo{};
-    deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    // Check if the physical device supports swapchain extension
+    if (!isSwapchainExtensionSupported(physicalDevice)) {
+        std::cerr << "VK_KHR_SWAPCHAIN extension not supported by the device!" << std::endl;
+        throw std::runtime_error("VK_KHR_SWAPCHAIN extension not supported by the device!");
+    }
 
-    // Choose features to enable (like geometry shaders)
-    VkPhysicalDeviceFeatures supportedFeatures;
-    vkGetPhysicalDeviceFeatures(physicalDevice, &supportedFeatures);
+    // Find queue families that support both graphics and presentation
+    uint32_t graphicsQueueFamilyIndex = UINT32_MAX;
+    uint32_t presentQueueFamilyIndex = UINT32_MAX;
 
-    VkPhysicalDeviceFeatures deviceFeatures{};
-    //if (supportedFeatures.geometryShader) {
-    //    deviceFeatures.geometryShader = VK_TRUE;
-    //}
+    if (!findGraphicsAndPresentQueueFamilies(physicalDevice, surface, graphicsQueueFamilyIndex, presentQueueFamilyIndex)) {
+        std::cerr << "No queue families found that support both graphics and presentation!" << std::endl;
+        throw std::runtime_error("No suitable queue families found!");
+    }
 
     // Queue create info
-    VkDeviceQueueCreateInfo queueCreateInfo{};
+    VkDeviceQueueCreateInfo queueCreateInfo = {};
     queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queueCreateInfo.queueFamilyIndex = graphicsQueueFamilyIndex; // Assume family 0 supports graphics commands
+    queueCreateInfo.queueFamilyIndex = graphicsQueueFamilyIndex;
     queueCreateInfo.queueCount = 1;
     float queuePriority = 1.0f;
     queueCreateInfo.pQueuePriorities = &queuePriority;
 
+    // Enabled extensions
+    std::vector<const char*> enabledExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+
+    // Get supported features
+    VkPhysicalDeviceFeatures deviceFeatures = {};
+    vkGetPhysicalDeviceFeatures(physicalDevice, &deviceFeatures);
+
+    VkDeviceCreateInfo deviceCreateInfo = {};
+    deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
     deviceCreateInfo.queueCreateInfoCount = 1;
     deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
+    deviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(enabledExtensions.size());
+    deviceCreateInfo.ppEnabledExtensionNames = enabledExtensions.data();
 
-    // Create logical device
-    if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device) != VK_SUCCESS) 
-    {
+    // Create the logical device
+    if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device) != VK_SUCCESS) {
         std::cerr << "Failed to create logical device!" << std::endl;
         throw std::runtime_error("Failed to create logical device!");
     }
 
+    // Get the queues for graphics and presentation
     vkGetDeviceQueue(device, graphicsQueueFamilyIndex, 0, &graphicsQueue);
+    vkGetDeviceQueue(device, presentQueueFamilyIndex, 0, &presentQueue);
 }
+
+
 
 VkDevice Device::getLogicalDevice() const
 {
@@ -208,4 +274,49 @@ void Device::cleanup()
 void Device::waitIdle()
 {
 	vkDeviceWaitIdle(device);
+}
+
+std::vector<VkSurfaceFormatKHR> Device::getSurfaceFormats(VkSurfaceKHR surface) const {
+    uint32_t formatCount;
+    vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, nullptr);
+
+    if (formatCount == 0) {
+        throw std::runtime_error("Failed to find any surface formats!");
+    }
+
+    std::vector<VkSurfaceFormatKHR> surfaceFormats(formatCount);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, surfaceFormats.data());
+
+    return surfaceFormats;
+}
+
+std::vector<VkPresentModeKHR> Device::getPresentModes(VkSurfaceKHR surface) const {
+    uint32_t presentModeCount;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, nullptr);
+
+    if (presentModeCount == 0) {
+        throw std::runtime_error("Failed to find any present modes!");
+    }
+
+    std::vector<VkPresentModeKHR> presentModes(presentModeCount);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, presentModes.data());
+
+    return presentModes;
+}
+
+uint32_t Device::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+    // Query the memory properties of the physical device (GPU)
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+
+    // Loop through all available memory types
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+        // Check if this memory type is suitable for the buffer (using typeFilter)
+        // and if it has the desired properties (using properties)
+        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i; // Return the index of the suitable memory type
+        }
+    }
+
+    throw std::runtime_error("Failed to find a suitable memory type!");
 }

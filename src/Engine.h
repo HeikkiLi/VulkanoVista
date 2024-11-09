@@ -23,8 +23,9 @@ private:
     Swapchain swapchain;
     Renderer renderer;
 
+    VkExtent2D windowExtent;  // holding the window size
+
     void initWindow();
     void initVulkan();
 
-    // TODO: Add synchronization objects and other members as needed
 };
