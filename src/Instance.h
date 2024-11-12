@@ -10,6 +10,10 @@
 class Instance
 {
 public:
+
+    Instance();
+    ~Instance();
+
     void create(SDL_Window* window); // Initialize Vulkan instance with SDL
     void cleanup(); // Cleanup Vulkan resources
 
@@ -27,6 +31,6 @@ private:
     // Helper functions for extension and layer setup
     std::vector<const char*> getRequiredExtensions(SDL_Window* window);
     std::vector<const char*> getValidationLayers();
+    bool checkInstanceExtensionSupport(std::vector<const char*>* checkExtensions);
 
-    // TODO: Add more functions if needed (debug setup, etc.)
 };

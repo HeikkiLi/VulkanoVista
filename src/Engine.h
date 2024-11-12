@@ -12,9 +12,14 @@ const int HEIGHT = 600;
 class Engine 
 {
 public:
-    void init();  // Initialize the engine
-    void run();   // Start the main loop
-    void cleanup(); // Cleanup resources
+    // Initialize the engine
+    int init();
+
+    // Start the main loop
+    void run();   
+
+    // Cleanup resources
+    void cleanup(); 
 
 private:
     Window window;
@@ -25,7 +30,7 @@ private:
 
     VkExtent2D windowExtent;  // holding the window size
 
-    void initWindow();
-    void initVulkan();
+    int initWindow();
+    int initVulkan();
 
 };

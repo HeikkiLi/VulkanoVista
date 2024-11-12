@@ -6,7 +6,10 @@ int main()
     Engine engine;
    
     // Initialize the engine
-    engine.init();
+    if (engine.init() == EXIT_FAILURE)
+    {
+        return EXIT_FAILURE;
+    }
    
     // Run the main loop
     engine.run();

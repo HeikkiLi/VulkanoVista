@@ -1,18 +1,13 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
-
-#include "Device.h"
-#include "Swapchain.h"
-#include "Window.h"
+#include <string>
 
 #include "Vertex.h"
 
-std::vector<Vertex> vertices = {
-    {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},  // Bottom vertex (red)
-    {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},   // Right vertex (green)
-    {{-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}},  // Left vertex (blue)
-};
+class Device;
+class Swapchain;
+class Window;
 
 class Renderer
 {
@@ -72,4 +67,7 @@ private:
     // Vertex buffer
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
+     
+    // Vertices
+    std::vector<Vertex> vertices;
 };

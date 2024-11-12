@@ -1,10 +1,22 @@
 #include "Engine.h"
 
+#include <stdexcept>
 
-void Engine::init()
+#include "Logger.h"
+
+int Engine::init()
 {
-    initWindow();
-    initVulkan();
+    if (initWindow() == EXIT_FAILURE)
+    {
+        return EXIT_FAILURE;
+    }
+
+    if (initVulkan() == EXIT_FAILURE)
+    {
+        return EXIT_FAILURE;
+    }
+
+    return 0;
 }
 
 void Engine::run() {
@@ -33,20 +45,36 @@ void Engine::cleanup()
     window.cleanup();
 }
 
-void Engine::initWindow()
+int Engine::initWindow()
 {
-	window.create(WIDTH, HEIGHT, "VulkanoVista");
-    windowExtent = { WIDTH, HEIGHT };
+    try {
+        window.create(WIDTH, HEIGHT, "VulkanoVista");
+        windowExtent = { WIDTH, HEIGHT };
+    }
+    catch (std::runtime_error &e) {
+        Logger::error("Failed to create window error: " + std::string(e.what()));
+        return EXIT_FAILURE;
+    }
+
+    return 0;
 }
 
-void Engine::initVulkan()
+int Engine::initVulkan()
 {
-    instance.create(window.getSDLWindow());
-    window.createSurface(instance);
-    instance.SetSurface(window.getSurface());
+    try {
+        instance.create(window.getSDLWindow());
+        window.createSurface(instance);
+        instance.SetSurface(window.getSurface());
 
-    device.pickPhysicalDevice(instance, window.getSurface());
-    device.createLogicalDevice(window.getSurface());
-    swapchain.create(&device, window.getSurface(), windowExtent);
-    renderer.setup(&device, &swapchain, &window);
+        device.pickPhysicalDevice(instance, window.getSurface());
+        device.createLogicalDevice(window.getSurface());
+        swapchain.create(&device, window.getSurface(), windowExtent);
+        renderer.setup(&device, &swapchain, &window);
+    }
+    catch (std::runtime_error& e) {
+        Logger::error("Failed to init Vulkan: " + std::string(e.what()));
+        return EXIT_FAILURE;
+    }
+
+    return 0;
 }

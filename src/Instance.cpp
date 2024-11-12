@@ -1,6 +1,17 @@
 #include "Instance.h"
 #include "Logger.h"
 
+
+Instance::Instance()
+{
+}
+
+Instance::~Instance()
+{
+    this->cleanup();
+}
+
+
 std::vector<const char*> Instance::getRequiredExtensions(SDL_Window* window) {
     unsigned extensionCount = 0;
     if (!SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, nullptr)) {
@@ -24,12 +35,46 @@ std::vector<const char*> Instance::getValidationLayers() {
     return layers;
 }
 
+bool Instance::checkInstanceExtensionSupport(std::vector<const char*>* checkExtensions)
+{
+    uint32_t extensionCount = 0;
+    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+
+    std::vector<VkExtensionProperties> extensions(extensionCount);
+    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
+
+    for (const auto& checkExtension : *checkExtensions)
+    {
+        bool hasExtension = false;
+        for (const auto& extension : extensions)
+        {
+            if (strcmp(checkExtension, extension.extensionName))
+            {
+                hasExtension = true;
+                break;
+            }
+        }
+
+        if (!hasExtension)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 void Instance::create(SDL_Window* window)
 {
     Logger::info("Creating Vulkan instance...");
 
     // Get required extensions from SDL
     auto extensions = getRequiredExtensions(window);
+
+    if (!checkInstanceExtensionSupport(&extensions))
+    {
+        throw std::runtime_error("VkInstance does no support required extensions!");
+    }
 
     // Set validation layers if in debug mode
     auto layers = getValidationLayers();
@@ -41,7 +86,7 @@ void Instance::create(SDL_Window* window)
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "VulkanoVista Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_0;
+    appInfo.apiVersion = VK_API_VERSION_1_3;
 
     // Instance creation info
     VkInstanceCreateInfo createInfo{};

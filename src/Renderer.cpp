@@ -4,6 +4,11 @@
 #include <fstream>
 #include <vector>
 
+
+#include "Device.h"
+#include "Swapchain.h"
+#include "Window.h"
+
 Renderer::~Renderer()
 {
     cleanup();
@@ -15,12 +20,19 @@ void Renderer::setup(Device* device,  Swapchain* swapchain, Window* window)
     this->swapchain = swapchain;   // Store pointer to Swapchain
     this->window = window;
 
+    vertices = {
+        {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},  // Bottom vertex (red)
+        {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},   // Right vertex (green)
+        {{-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}},  // Left vertex (blue)
+    };
+
     createRenderPass();
     createGraphicsPipeline();
     createFramebuffers();
     createCommandPool();
     createCommandBuffers();
     createSyncObjects();
+
 }
 
 

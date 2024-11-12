@@ -106,7 +106,7 @@ QueueFamilyIndices Device::findQueueFamilies(VkPhysicalDevice device, VkSurfaceK
 
 bool Device::checkDeviceExtensionSupport(VkPhysicalDevice device) 
 {
-    uint32_t extensionCount;
+    uint32_t extensionCount = 0;
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
 
     std::vector<VkExtensionProperties> availableExtensions(extensionCount);
