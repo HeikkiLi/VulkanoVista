@@ -48,7 +48,7 @@ bool Instance::checkInstanceExtensionSupport(std::vector<const char*>* checkExte
         bool hasExtension = false;
         for (const auto& extension : extensions)
         {
-            if (strcmp(checkExtension, extension.extensionName))
+            if (strcmp(checkExtension, extension.extensionName) == 0)
             {
                 hasExtension = true;
                 break;
@@ -61,6 +61,31 @@ bool Instance::checkInstanceExtensionSupport(std::vector<const char*>* checkExte
         }
     }
 
+    return true;
+}
+
+bool Instance::checkValidationLayerSupport(const std::vector<const char*>& validationLayers) {
+    uint32_t layerCount;
+    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+    std::vector<VkLayerProperties> availableLayers(layerCount);
+    vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+
+    for (const char* layerName : validationLayers) {
+        bool layerFound = false;
+
+        for (const auto& layerProperties : availableLayers) {
+            if (strcmp(layerName, layerProperties.layerName) == 0) {
+                layerFound = true;
+                break;
+            }
+        }
+
+        if (!layerFound) {
+            Logger::error("Validation layer not found: " + std::string(layerName));
+            return false;
+        }
+    }
     return true;
 }
 
@@ -78,7 +103,9 @@ void Instance::create(SDL_Window* window)
 
     // Set validation layers if in debug mode
     auto layers = getValidationLayers();
-
+    if (!checkValidationLayerSupport(layers)) {
+        throw std::runtime_error("Validation layers requested, but not available!");
+    }
     // Application info
     VkApplicationInfo appInfo{};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -86,7 +113,7 @@ void Instance::create(SDL_Window* window)
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "VulkanoVista Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_3;
+    appInfo.apiVersion = VK_API_VERSION_1_2;
 
     // Instance creation info
     VkInstanceCreateInfo createInfo{};

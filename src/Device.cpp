@@ -222,7 +222,7 @@ void Device::createLogicalDevice(VkSurfaceKHR surface)
     // Enabled extensions
     std::vector<const char*> enabledExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
-    // Get supported features
+    // physical device features logical device will use.
     VkPhysicalDeviceFeatures deviceFeatures = {};
     vkGetPhysicalDeviceFeatures(physicalDevice, &deviceFeatures);
 

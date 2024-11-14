@@ -8,25 +8,23 @@ struct Vertex {
     glm::vec3 color;
 
     static std::vector<VkVertexInputBindingDescription> getBindingDescriptions() {
-        std::vector<VkVertexInputBindingDescription> bindingDescriptions(1);
-
-        bindingDescriptions[0].binding = 0;
-        bindingDescriptions[0].stride = sizeof(Vertex);
-        bindingDescriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-        return bindingDescriptions;
+        VkVertexInputBindingDescription bindingDescription{};
+        bindingDescription.binding = 0;
+        bindingDescription.stride = sizeof(Vertex); // Size of a vertex (position + color)
+        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX; // Each vertex has its own data
+        return { bindingDescription };
     }
 
     static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
         std::vector<VkVertexInputAttributeDescription> attributeDescriptions(2);
 
-        // Position attribute
+        // Position attribute (location = 0)
         attributeDescriptions[0].binding = 0;
         attributeDescriptions[0].location = 0;
         attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
         attributeDescriptions[0].offset = offsetof(Vertex, position);
 
-        // Color attribute
+        // Color attribute (location = 1)
         attributeDescriptions[1].binding = 0;
         attributeDescriptions[1].location = 1;
         attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;

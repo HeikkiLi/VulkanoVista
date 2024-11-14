@@ -32,5 +32,6 @@ private:
     std::vector<const char*> getRequiredExtensions(SDL_Window* window);
     std::vector<const char*> getValidationLayers();
     bool checkInstanceExtensionSupport(std::vector<const char*>* checkExtensions);
+    bool checkValidationLayerSupport(const std::vector<const char*>& validationLayers);
 
 };

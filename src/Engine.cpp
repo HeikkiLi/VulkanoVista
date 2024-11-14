@@ -38,10 +38,19 @@ void Engine::run() {
 
 void Engine::cleanup()
 {
+    // First, clean up resources that depend on the swapchain, such as framebuffers
+    swapchain.cleanup();  // Clean up swapchain resources first.
+
+    // Clean up renderer resources (e.g., pipelines, command pools, etc.)
     renderer.cleanup();
-    swapchain.cleanup();
+
+    // Clean up device-specific resources like buffers, memory, etc.
     device.cleanup();
+
+    // Finally, clean up the Vulkan instance.
     instance.cleanup();
+
+    // Clean up window (e.g., GLFW, SDL, or other windowing libraries)
     window.cleanup();
 }
 
