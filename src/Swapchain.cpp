@@ -28,7 +28,7 @@ void Swapchain::create(Device* device, VkSurfaceKHR surface, VkExtent2D windowEx
     createInfo.imageColorSpace = surfaceFormat.colorSpace;
     createInfo.imageExtent = extent;
     createInfo.imageArrayLayers = 1;
-    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
     // Define how to handle swapchain images (e.g., in case of multiple queues)
     QueueFamilyIndices indices = device->findQueueFamilies(device->getPhysicalDevice(), surface);
@@ -123,6 +123,14 @@ VkSurfaceFormatKHR Swapchain::chooseSurfaceFormat(const std::vector<VkSurfaceFor
             return availableFormat;
         }
     }
+
+    // Fallback to a commonly supported format
+    for (const auto& availableFormat : availableFormats) {
+        if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM) {
+            return availableFormat;
+        }
+    }
+
     return availableFormats[0];
 }
 
