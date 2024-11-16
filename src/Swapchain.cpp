@@ -5,18 +5,18 @@ void Swapchain::create(Device* device, VkSurfaceKHR surface, VkExtent2D windowEx
     this->device = device;
 
     // Query surface capabilities
-    VkSurfaceCapabilitiesKHR capabilities;
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device->getPhysicalDevice(), surface, &capabilities);
+    VkSurfaceCapabilitiesKHR surfaceCapabilities;
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device->getPhysicalDevice(), surface, &surfaceCapabilities);
 
     // Select surface format, present mode, and swap extent
     VkSurfaceFormatKHR surfaceFormat = chooseSurfaceFormat(device->getSurfaceFormats(surface));
     VkPresentModeKHR presentMode = choosePresentMode(device->getPresentModes(surface));
-    extent = chooseSwapExtent(capabilities, windowExtent.width, windowExtent.height);
+    extent = chooseSwapExtent(surfaceCapabilities, windowExtent.width, windowExtent.height);
 
-    // Set the image count (minimum plus one for double-buffering, capped by max)
-    uint32_t imageCount = capabilities.minImageCount + 1;
-    if (capabilities.maxImageCount > 0 && imageCount > capabilities.maxImageCount) {
-        imageCount = capabilities.maxImageCount;
+    // Set the image count (minimum plus one for triple-buffering, capped by max)
+    uint32_t imageCount = surfaceCapabilities.minImageCount + 1;
+    if (surfaceCapabilities.maxImageCount > 0 && imageCount > surfaceCapabilities.maxImageCount) {
+        imageCount = surfaceCapabilities.maxImageCount;
     }
 
     // Define swapchain create info
@@ -43,7 +43,7 @@ void Swapchain::create(Device* device, VkSurfaceKHR surface, VkExtent2D windowEx
         createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     }
 
-    createInfo.preTransform = capabilities.currentTransform;
+    createInfo.preTransform = surfaceCapabilities.currentTransform;
     createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     createInfo.presentMode = presentMode;
     createInfo.clipped = VK_TRUE;
@@ -117,6 +117,12 @@ VkImageView Swapchain::getImageView(size_t index) const
 
 // Helper to choose the best surface format from available options
 VkSurfaceFormatKHR Swapchain::chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
+    
+    if (availableFormats.size() == 1 && availableFormats[0].format == VK_FORMAT_UNDEFINED)
+    {
+        return { VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
+    }
+
     for (const auto& availableFormat : availableFormats) {
         if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
             availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {

@@ -27,10 +27,10 @@ private:
 
     // Swapchain handle and properties
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
-    VkFormat imageFormat;                   // Format of swapchain images
-    VkExtent2D extent;                      // Dimensions of swapchain images
-    std::vector<VkImage> swapchainImages;            // Images in the swapchain
-    std::vector<VkImageView> swapchainImageViews;    // Image views for each swapchain image
+    VkFormat imageFormat;                           // Format of swapchain images
+    VkExtent2D extent;                              // Dimensions of swapchain images
+    std::vector<VkImage> swapchainImages;           // Images in the swapchain
+    std::vector<VkImageView> swapchainImageViews;   // Image views for each swapchain image
 
     // Reference to the logical device (for cleanup, etc.)
     const Device* device = nullptr;

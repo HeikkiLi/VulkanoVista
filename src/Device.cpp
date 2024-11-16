@@ -119,6 +119,7 @@ bool Device::checkDeviceExtensionSupport(VkPhysicalDevice device)
         requiredExtensions.erase(extension.extensionName);
     }
 
+
     return requiredExtensions.empty();
 }
 
@@ -166,7 +167,7 @@ bool Device::isSwapchainExtensionSupported(VkPhysicalDevice physicalDevice) {
     return false; // Extension not found
 }
 
-bool  Device::findGraphicsAndPresentQueueFamilies(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, uint32_t& graphicsQueueFamilyIndex, uint32_t& presentQueueFamilyIndex) {
+bool Device::findGraphicsAndPresentQueueFamilies(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, uint32_t& graphicsQueueFamilyIndex, uint32_t& presentQueueFamilyIndex) {
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
 
