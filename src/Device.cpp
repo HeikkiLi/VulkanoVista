@@ -269,6 +269,13 @@ VkQueue Device::getPresentQueue() const
 
 void Device::cleanup()
 {
+
+    // Destroy command pool
+    if (commandPool != VK_NULL_HANDLE) {
+        vkDestroyCommandPool(device, commandPool, nullptr);
+        commandPool = VK_NULL_HANDLE;
+    }
+
 	vkDestroyDevice(device, nullptr);
 }
 
@@ -320,4 +327,110 @@ uint32_t Device::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags prope
     }
 
     throw std::runtime_error("Failed to find a suitable memory type!");
+}
+
+VkBuffer Device::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkDeviceMemory& bufferMemory) {
+    VkBuffer buffer;
+
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = size;
+    bufferInfo.usage = usage;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create buffer!");
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+
+    if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate buffer memory!");
+    }
+
+    vkBindBufferMemory(device, buffer, bufferMemory, 0);
+
+    return buffer;
+}
+
+void Device::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
+    // Allocate a temporary command buffer for the copy operation
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = commandPool;
+    allocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer commandBuffer;
+    if (vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate command buffer!");
+    }
+
+    // Begin recording the command buffer
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to begin command buffer!");
+    }
+
+    // Copy data from the source buffer to the destination buffer
+    VkBufferCopy copyRegion{};
+    copyRegion.srcOffset = 0;
+    copyRegion.dstOffset = 0;
+    copyRegion.size = size;
+    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to record command buffer!");
+    }
+
+    // Create a fence to wait for the copy operation to complete
+    VkFenceCreateInfo fenceInfo{};
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    VkFence copyFence;
+    if (vkCreateFence(device, &fenceInfo, nullptr, &copyFence) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create fence!");
+    }
+
+    // Submit the command buffer to the graphics queue
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+
+    if (vkQueueSubmit(getGraphicsQueue(), 1, &submitInfo, copyFence) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to submit copy command buffer!");
+    }
+
+    // Wait for the copy operation to complete
+    vkWaitForFences(device, 1, &copyFence, VK_TRUE, UINT64_MAX);
+
+    // Clean up the fence and command buffer
+    vkDestroyFence(device, copyFence, nullptr);
+    vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+}
+
+
+void Device::createCommandPool() {
+    VkCommandPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.queueFamilyIndex = getGraphicsQueueFamilyIndex();
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+
+    if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create command pool!");
+    }
+}
+
+VkCommandPool Device::getCommandPool()
+{
+    return commandPool;
 }

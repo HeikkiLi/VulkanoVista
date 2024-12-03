@@ -45,6 +45,13 @@ public:
     std::vector<VkSurfaceFormatKHR> getSurfaceFormats(VkSurfaceKHR surface) const;
     std::vector<VkPresentModeKHR> getPresentModes(VkSurfaceKHR surface) const;
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+
+
+    void createCommandPool();
+    VkCommandPool getCommandPool();
+
+    VkBuffer createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkDeviceMemory& bufferMemory);
+    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
     
 private:
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
@@ -52,6 +59,8 @@ private:
     VkQueue graphicsQueue;
     VkQueue presentQueue;
     uint32_t graphicsQueueFamilyIndex = UINT32_MAX;
+
+    VkCommandPool commandPool = VK_NULL_HANDLE;
 
     std::vector<const char*> deviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME  // Required for swapchain creation

@@ -3,11 +3,14 @@
 #include <stdexcept>
 #include <fstream>
 #include <vector>
-
+#include <array>
 
 #include "Device.h"
 #include "Swapchain.h"
 #include "Window.h"
+#include "Mesh.h"
+#include "Vertex.h"
+
 
 Renderer::~Renderer()
 {
@@ -16,17 +19,17 @@ Renderer::~Renderer()
 
 void Renderer::setup(Device* device,  Swapchain* swapchain, Window* window)
 {
-    this->device = device;         // Store pointer to Device
-    this->swapchain = swapchain;   // Store pointer to Swapchain
-    this->window = window;
+    this->device = device;          // Store pointer to Device
+    this->swapchain = swapchain;    // Store pointer to Swapchain
+    this->window = window;          // and window..
 
-    vertices = {
+    std::vector<Vertex> vertices = {
         {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},  // Bottom vertex (red)
         {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},   // Right vertex (green)
         {{-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}},  // Left vertex (blue)
     };
 
-    createCommandPool();
+    device->createCommandPool();
 
     createVertexBuffer();
 
@@ -42,7 +45,9 @@ void Renderer::setup(Device* device,  Swapchain* swapchain, Window* window)
 // Acquire image from swapchain, record command buffer, submit, and present
 void Renderer::drawFrame()
 {
+    // wait for fences to signal (open) from last draw
     vkWaitForFences(device->getLogicalDevice(), 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+    // close fences
     vkResetFences(device->getLogicalDevice(), 1, &inFlightFences[currentFrame]);
 
     // Acquire an image from the swapchain
@@ -85,7 +90,6 @@ void Renderer::drawFrame()
     // Present the image
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = signalSemaphores;
 
@@ -110,6 +114,7 @@ void Renderer::drawFrame()
 void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
 
     if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
         throw std::runtime_error("Failed to begin command buffer!");
@@ -197,7 +202,7 @@ void Renderer::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize s
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandPool = commandPool;
+    allocInfo.commandPool = device->getCommandPool();
     allocInfo.commandBufferCount = 1;
 
     VkCommandBuffer commandBuffer;
@@ -248,7 +253,7 @@ void Renderer::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize s
 
     // Clean up the fence and command buffer
     vkDestroyFence(device->getLogicalDevice(), copyFence, nullptr);
-    vkFreeCommandBuffers(device->getLogicalDevice(), commandPool, 1, &commandBuffer);
+    vkFreeCommandBuffers(device->getLogicalDevice(), device->getCommandPool() , 1, &commandBuffer);
 }
 
 
@@ -280,7 +285,7 @@ void Renderer::cleanupSwapchain() {
 
     // Free command buffers, as they are tied to the old swapchain images
     if (!commandBuffers.empty()) {
-        vkFreeCommandBuffers(device->getLogicalDevice(), commandPool, static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
+        vkFreeCommandBuffers(device->getLogicalDevice(), device->getCommandPool(), static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
         commandBuffers.clear();
     }
 
@@ -294,32 +299,56 @@ void Renderer::cleanupSwapchain() {
 // Create the render pass
 void Renderer::createRenderPass() {
     VkAttachmentDescription colorAttachment{};
-    colorAttachment.format = swapchain->getImageFormat(); // Format of the swapchain image
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // Clear the attachment at the beginning
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE; // Store the result of the rendering
+    colorAttachment.format = swapchain->getImageFormat();               // Format of the swapchain image
+    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;                    // Number of samples to write for multisampling
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;               // Clear the attachment at the beginning
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;             // Store the result of the rendering
     colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // The swapchain image is ready for presentation
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;      // The swapchain image is ready for presentation
 
-    // Add color attachment reference to subpass
+    // Color attachment reference to subpass
     VkAttachmentReference colorAttachmentRef{};
     colorAttachmentRef.attachment = 0; // The index of the color attachment
     colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-    // Configure the render pass to use this color attachment
+    // Configuring the render pass to use this color attachment
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &colorAttachmentRef;
 
+    // determine when layout transitions occur using subpass dependencies
+    std::array<VkSubpassDependency, 2> subpassDependencies;
+
+    // conversion from VK_IMAGE_LAYOUT_UNDEFINED to VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+    subpassDependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+    subpassDependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    subpassDependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    subpassDependencies[0].dstSubpass = 0;
+    subpassDependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    subpassDependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    subpassDependencies[0].dependencyFlags = 0;
+
+    // conversion from VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+    subpassDependencies[1].srcSubpass = 0;
+    subpassDependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    subpassDependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    subpassDependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+    subpassDependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    subpassDependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    subpassDependencies[1].dependencyFlags = 0;
+
+    // Crete render pass info.
     VkRenderPassCreateInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     renderPassInfo.attachmentCount = 1;
     renderPassInfo.pAttachments = &colorAttachment;
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
+    renderPassInfo.dependencyCount = static_cast<uint32_t>(subpassDependencies.size());
+    renderPassInfo.pDependencies = subpassDependencies.data();
 
     if (vkCreateRenderPass(device->getLogicalDevice(), &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create render pass!");
@@ -329,7 +358,7 @@ void Renderer::createRenderPass() {
 
 // Create the pipeline
 void Renderer::createGraphicsPipeline() {
-    // Shader stages: You need at least a vertex shader
+    // Shader stages.
     VkPipelineShaderStageCreateInfo shaderStages[2];
     shaderStages[0] = createShaderStage("shaders/vertex_shader.spv", VK_SHADER_STAGE_VERTEX_BIT);
     shaderStages[1] = createShaderStage("shaders/fragment_shader.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -386,14 +415,15 @@ void Renderer::createGraphicsPipeline() {
     // Multisample state
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampling.sampleShadingEnable = VK_FALSE;
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT; // Change if you use multisampling
+    multisampling.sampleShadingEnable = VK_FALSE;               // enabling multisampling or not
+    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT; // number of samples to use per fragment
 
     // Color blend state
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-    colorBlendAttachment.blendEnable = VK_FALSE;  // No blending
-    colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-    colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+    colorBlendAttachment.blendEnable = VK_TRUE;
+    // (srcColorBlendFactor * new colour) colorBlendOp (dstColorBlendFactor * old color)
+    colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
     colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
     colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
@@ -424,8 +454,8 @@ void Renderer::createGraphicsPipeline() {
 
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencil.depthTestEnable = VK_FALSE;      // Disable depth testing
-    depthStencil.depthWriteEnable = VK_FALSE;     // Disable depth writing
+    depthStencil.depthTestEnable = VK_FALSE;            // Disable depth testing
+    depthStencil.depthWriteEnable = VK_FALSE;           // Disable depth writing
     depthStencil.depthCompareOp = VK_COMPARE_OP_ALWAYS; // Depth comparison is always true
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.stencilTestEnable = VK_FALSE;
@@ -477,24 +507,12 @@ void Renderer::createFramebuffers() {
     }
 }
 
-
-void Renderer::createCommandPool() {
-    VkCommandPoolCreateInfo poolInfo{};
-    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    poolInfo.queueFamilyIndex = device->getGraphicsQueueFamilyIndex();
-    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-
-    if (vkCreateCommandPool(device->getLogicalDevice(), &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create command pool!");
-    }
-}
-
 void Renderer::createCommandBuffers() {
     commandBuffers.resize(framebuffers.size());
 
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.commandPool = commandPool;
+    allocInfo.commandPool = device->getCommandPool();
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size());
 
@@ -640,12 +658,6 @@ void Renderer::cleanup() {
     renderFinishedSemaphores.clear();
     imageAvailableSemaphores.clear();
     inFlightFences.clear();
-
-    // Destroy command pool
-    if (commandPool != VK_NULL_HANDLE) {
-        vkDestroyCommandPool(device->getLogicalDevice(), commandPool, nullptr);
-        commandPool = VK_NULL_HANDLE;
-    }
 
     // Destroy shader modules
     for (auto shaderModule : shaderModules) {

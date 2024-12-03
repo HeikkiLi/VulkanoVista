@@ -3,11 +3,12 @@
 #include <vulkan/vulkan.h>
 #include <string>
 
-#include "Vertex.h"
+//#include "Vertex.h"
 
 class Device;
 class Swapchain;
 class Window;
+class Mesh;
 
 class Renderer
 {
@@ -18,6 +19,7 @@ public:
     void cleanup();
     
     void recreateSwapchain(VkExtent2D newExtent);
+
     VkBuffer createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkDeviceMemory& bufferMemory);
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
@@ -25,7 +27,6 @@ private:
     void createRenderPass();
     void createGraphicsPipeline();
     void createFramebuffers();
-    void createCommandPool();
     void createCommandBuffers();
     void createSyncObjects();
     
@@ -46,7 +47,6 @@ private:
     VkRenderPass renderPass = VK_NULL_HANDLE;
     VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
     VkPipeline graphicsPipeline = VK_NULL_HANDLE;
-    VkCommandPool commandPool = VK_NULL_HANDLE;
 
     // Framebuffers for each swapchain image
     std::vector<VkFramebuffer> framebuffers;
@@ -65,9 +65,12 @@ private:
     std::vector<VkShaderModule> shaderModules; // To store created shader modules
 
     // Vertex buffer
-    VkBuffer vertexBuffer;
-    VkDeviceMemory vertexBufferMemory;
+    //VkBuffer vertexBuffer;
+    //VkDeviceMemory vertexBufferMemory;
      
     // Vertices
-    std::vector<Vertex> vertices;
+    //std::vector<Vertex> vertices;
+
+    std::vector<Mesh*> meshes;
+
 };
