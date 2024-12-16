@@ -3,6 +3,7 @@
 #include <stdexcept>
 
 #include "Logger.h"
+#include "Mesh.h"
 
 int Engine::init()
 {
@@ -79,6 +80,36 @@ int Engine::initVulkan()
         device.createLogicalDevice(window.getSurface());
         swapchain.create(&device, window.getSurface(), windowExtent);
         renderer.setup(&device, &swapchain, &window);
+        
+        std::vector<Vertex> vertices = {
+            {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},  // Bottom vertex (red)
+            {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},   // Right vertex (green)
+            {{-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}}   // Left vertex (blue)
+        };
+
+        std::vector<uint32_t> indices = { 0, 1, 2 };
+
+        // Create the mesh
+        auto mesh = std::make_shared<Mesh>(&device, vertices, indices);
+
+
+        // Add the mesh to the renderer
+        renderer.addMesh(mesh);
+        
+        std::vector<Vertex> vertices2 = {
+            {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},     // Bottom vertex (red)
+            {{-0.25f, 0.25f, 0.0f}, {0.0f, 1.0f, 0.0f}},    // Right vertex (green)
+            {{-0.75f, 0.25f, 0.0f}, {0.0f, 0.0f, 1.0f}}     // Left vertex (blue)
+        };
+
+        std::vector<uint32_t> indices2 = { 0, 1, 2 };
+
+        // Create the mesh
+        auto mesh2 = std::make_shared<Mesh>(&device, vertices2, indices2);
+
+
+        // Add the mesh to the renderer
+        renderer.addMesh(mesh2);
     }
     catch (std::runtime_error& e) {
         Logger::error("Failed to init Vulkan: " + std::string(e.what()));

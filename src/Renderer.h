@@ -2,6 +2,8 @@
 
 #include <vulkan/vulkan.h>
 #include <string>
+#include <vector>
+#include <memory>
 
 //#include "Vertex.h"
 
@@ -22,6 +24,7 @@ public:
 
     VkBuffer createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkDeviceMemory& bufferMemory);
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+    void addMesh(std::shared_ptr<Mesh> mesh);
 
 private:
     void createRenderPass();
@@ -36,7 +39,7 @@ private:
 
     VkPipelineShaderStageCreateInfo createShaderStage(const std::string& filepath, VkShaderStageFlagBits stage);
 
-    void createVertexBuffer();
+    //void createVertexBuffer();
 
     // Reference to external objects (set in setup)
     Device* device = nullptr;       // Pointer to Device for easy access
@@ -71,6 +74,6 @@ private:
     // Vertices
     //std::vector<Vertex> vertices;
 
-    std::vector<Mesh*> meshes;
+    std::vector<std::shared_ptr<Mesh>> meshes;
 
 };

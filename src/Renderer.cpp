@@ -23,15 +23,17 @@ void Renderer::setup(Device* device,  Swapchain* swapchain, Window* window)
     this->swapchain = swapchain;    // Store pointer to Swapchain
     this->window = window;          // and window..
 
+    /*
     std::vector<Vertex> vertices = {
         {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},  // Bottom vertex (red)
         {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},   // Right vertex (green)
         {{-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}},  // Left vertex (blue)
     };
+    */
 
     device->createCommandPool();
 
-    createVertexBuffer();
+    //createVertexBuffer();
 
     createRenderPass();
     createGraphicsPipeline();
@@ -136,14 +138,12 @@ void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 
     // Bind graphics pipeline
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-
-    // Bind vertex buffer
-    VkBuffer vertexBuffers[] = { vertexBuffer };
-    VkDeviceSize offsets[] = { 0 };
-    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-
-    // Draw command
-    vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+    
+    // Iterate over all meshes and draw them
+    for (const auto& mesh : meshes) {
+        mesh->bind(commandBuffer);  // Bind vertex and index buffers
+        mesh->draw(commandBuffer); // Issue indexed draw call
+    }
 
     vkCmdEndRenderPass(commandBuffer);
 
@@ -256,8 +256,9 @@ void Renderer::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize s
     vkFreeCommandBuffers(device->getLogicalDevice(), device->getCommandPool() , 1, &commandBuffer);
 }
 
-
-
+void Renderer::addMesh(std::shared_ptr<Mesh> mesh) {
+    meshes.push_back(mesh);
+}
 
 void Renderer::cleanupSwapchain() {
     // Destroy framebuffers for each swapchain image view
@@ -585,6 +586,7 @@ VkPipelineShaderStageCreateInfo Renderer::createShaderStage(const std::string& f
     return shaderStageInfo; // Return the created shader stage info
 }
 
+/*
 void Renderer::createVertexBuffer() {
     VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
     if (vertices.empty()) {
@@ -615,6 +617,7 @@ void Renderer::createVertexBuffer() {
     vkDestroyBuffer(device->getLogicalDevice(), stagingBuffer, nullptr);
     vkFreeMemory(device->getLogicalDevice(), stagingBufferMemory, nullptr);
 }
+*/
 
 void Renderer::cleanup() {
     // Destroy graphics pipeline
@@ -668,12 +671,17 @@ void Renderer::cleanup() {
     shaderModules.clear();
 
     // Destroy buffers and free memory
-    if (vertexBuffer != VK_NULL_HANDLE) {
-        vkDestroyBuffer(device->getLogicalDevice(), vertexBuffer, nullptr);
-        vertexBuffer = VK_NULL_HANDLE;
+    //if (vertexBuffer != VK_NULL_HANDLE) {
+    //    vkDestroyBuffer(device->getLogicalDevice(), vertexBuffer, nullptr);
+    //    vertexBuffer = VK_NULL_HANDLE;
+    //}
+    //if (vertexBufferMemory != VK_NULL_HANDLE) {
+    //    vkFreeMemory(device->getLogicalDevice(), vertexBufferMemory, nullptr);
+    //    vertexBufferMemory = VK_NULL_HANDLE;
+    //}
+
+    for (auto& mesh : meshes) {
+        mesh.reset();
     }
-    if (vertexBufferMemory != VK_NULL_HANDLE) {
-        vkFreeMemory(device->getLogicalDevice(), vertexBufferMemory, nullptr);
-        vertexBufferMemory = VK_NULL_HANDLE;
-    }
+    meshes.clear();
 }
