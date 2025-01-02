@@ -3,7 +3,8 @@
 #include <iostream>
 #include <string>
 
-class Logger {
+class Logger 
+{
 public:
     static void info(const std::string& message) {
         log(message, "[INFO]");

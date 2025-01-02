@@ -1,6 +1,7 @@
 #include "Engine.h"
 
 #include <stdexcept>
+#include <chrono>
 
 #include "Logger.h"
 #include "Mesh.h"
@@ -20,7 +21,10 @@ int Engine::init()
     return 0;
 }
 
-void Engine::run() {
+void Engine::run()
+{
+    auto lastTime = std::chrono::high_resolution_clock::now();
+
     while (!window.shouldClose()) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
@@ -30,6 +34,13 @@ void Engine::run() {
             }
             window.pollEvents();
         }
+
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        float deltaTime = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - lastTime).count();
+        lastTime = currentTime;
+
+        // Update the renderer
+        renderer.update(deltaTime);
 
         renderer.drawFrame();
     }
@@ -79,11 +90,11 @@ int Engine::initVulkan()
         device.createLogicalDevice(window.getSurface());
         swapchain.create(&device, window.getSurface(), windowExtent);
         renderer.setup(&device, &swapchain, &window);
-        
+
         std::vector<Vertex> vertices = {
-            {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},  // Bottom vertex (red)
-            {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},   // Right vertex (green)
-            {{-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}}   // Left vertex (blue)
+           {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},  // Bottom vertex (red)
+           {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},   // Right vertex (green)
+           {{-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}}   // Left vertex (blue)
         };
 
         std::vector<uint32_t> indices = { 0, 1, 2 };
@@ -93,7 +104,7 @@ int Engine::initVulkan()
 
         // Add the mesh to the renderer
         renderer.addMesh(mesh);
-        
+
         std::vector<Vertex> vertices2 = {
             {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},     // Bottom vertex (red)
             {{-0.25f, 0.25f, 0.0f}, {0.0f, 1.0f, 0.0f}},    // Right vertex (green)
@@ -107,6 +118,8 @@ int Engine::initVulkan()
 
         // Add the mesh to the renderer
         renderer.addMesh(mesh2);
+
+        renderer.finalizeSetup();
     }
     catch (std::runtime_error& e) {
         Logger::error("Failed to init Vulkan: " + std::string(e.what()));

@@ -5,11 +5,15 @@
 #include <vector>
 #include <array>
 
+#include <glm/gtc/matrix_transform.hpp>
+
+#include "Utils.h"
 #include "Device.h"
 #include "Swapchain.h"
 #include "Window.h"
 #include "Mesh.h"
 #include "Vertex.h"
+#include "Logger.h"
 
 
 Renderer::~Renderer()
@@ -26,12 +30,30 @@ void Renderer::setup(Device* device,  Swapchain* swapchain, Window* window)
     device->createCommandPool();
 
     createRenderPass();
+    createDescriptorSetLayout();
     createGraphicsPipeline();
     createFramebuffers();
+
     createCommandBuffers();
+//    createDescriptorPool();
+//    createDescriptorSets();
+
     createSyncObjects();
+
+    // TODO refactor to mesh the mesh transform, and the camera
+    mvp.projection = glm::perspective(glm::radians(45.0f), (float)swapchain->getExtent().width / (float)swapchain->getExtent().height, 0.1f, 100.0f);
+    mvp.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    mvp.model = glm::mat4(1.0f); // object position in world, now leave as they are.
+
+    mvp.projection[1][1] *= -1;
+
 }
 
+void Renderer::finalizeSetup()
+{
+    createDescriptorPool();
+    createDescriptorSets();
+}
 
 // Acquire image from swapchain, record command buffer, submit, and present
 void Renderer::drawFrame()
@@ -40,6 +62,7 @@ void Renderer::drawFrame()
     vkWaitForFences(device->getLogicalDevice(), 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
     // close fences
     vkResetFences(device->getLogicalDevice(), 1, &inFlightFences[currentFrame]);
+
 
     // Acquire an image from the swapchain
     uint32_t imageIndex;
@@ -52,6 +75,8 @@ void Renderer::drawFrame()
     else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
         throw std::runtime_error("Failed to acquire swap chain image!");
     }
+
+    updateUniformBuffer(imageIndex);
 
     // Record commands to command buffer (for this specific image)
     vkResetCommandBuffer(commandBuffers[imageIndex], 0);
@@ -101,8 +126,24 @@ void Renderer::drawFrame()
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
+void Renderer::update(float deltaTime) 
+{
+    const float rotationSpeed = 45.0f; // Rotate 45 degrees per second
 
-void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
+    // Calculate rotation angle in radians based on deltaTime
+    float rotationAngle = glm::radians(rotationSpeed * deltaTime);
+
+    // a rotation matrix
+    glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), rotationAngle, glm::vec3(0.0f, 0.0f, 1.0f));
+
+    // Apply rotation to the model matrix
+    mvp.model = rotation * mvp.model;
+}
+
+
+
+void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) 
+{
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
@@ -129,9 +170,14 @@ void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
     
     // Iterate over all meshes and draw them
-    for (const auto& mesh : meshes) {
-        mesh->bind(commandBuffer);  // Bind vertex and index buffers
-        mesh->draw(commandBuffer);  // Issue indexed draw call
+    for (size_t i = 0; i < meshes.size(); i++) {
+
+        // bind descriptor sets
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+            0, 1, &descriptorSets[i], 0, nullptr);
+
+        meshes[i]->bind(commandBuffer);  // Bind vertex and index buffers
+        meshes[i]->draw(commandBuffer);  // Issue indexed draw call
     }
 
     vkCmdEndRenderPass(commandBuffer);
@@ -142,7 +188,8 @@ void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 }
 
 
-void Renderer::recreateSwapchain(VkExtent2D windowExtent) {
+void Renderer::recreateSwapchain(VkExtent2D windowExtent) 
+{
     // Wait until the device is idle
     vkDeviceWaitIdle(device->getLogicalDevice());
     // Cleanup swapchain-related resources
@@ -156,100 +203,25 @@ void Renderer::recreateSwapchain(VkExtent2D windowExtent) {
     createCommandBuffers();
 }
 
-VkBuffer Renderer::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkDeviceMemory& bufferMemory) {
-    VkBuffer buffer;
-
-    VkBufferCreateInfo bufferInfo{};
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = size;
-    bufferInfo.usage = usage;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    if (vkCreateBuffer(device->getLogicalDevice(), &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create buffer!");
-    }
-
-    VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(device->getLogicalDevice(), buffer, &memRequirements);
-
-    VkMemoryAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = device->findMemoryType(memRequirements.memoryTypeBits, properties);
-
-    if (vkAllocateMemory(device->getLogicalDevice(), &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate buffer memory!");
-    }
-
-    vkBindBufferMemory(device->getLogicalDevice(), buffer, bufferMemory, 0);
-
-    return buffer;
-}
-
-void Renderer::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
-    // Allocate a temporary command buffer for the copy operation
-    VkCommandBufferAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandPool = device->getCommandPool();
-    allocInfo.commandBufferCount = 1;
-
-    VkCommandBuffer commandBuffer;
-    if (vkAllocateCommandBuffers(device->getLogicalDevice(), &allocInfo, &commandBuffer) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate command buffer!");
-    }
-
-    // Begin recording the command buffer
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to begin command buffer!");
-    }
-
-    // Copy data from the source buffer to the destination buffer
-    VkBufferCopy copyRegion{};
-    copyRegion.srcOffset = 0;
-    copyRegion.dstOffset = 0;
-    copyRegion.size = size;
-    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
-
-    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to record command buffer!");
-    }
-
-    // Create a fence to wait for the copy operation to complete
-    VkFenceCreateInfo fenceInfo{};
-    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    VkFence copyFence;
-    if (vkCreateFence(device->getLogicalDevice(), &fenceInfo, nullptr, &copyFence) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create fence!");
-    }
-
-    // Submit the command buffer to the graphics queue
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
-
-    if (vkQueueSubmit(device->getGraphicsQueue(), 1, &submitInfo, copyFence) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to submit copy command buffer!");
-    }
-
-    // Wait for the copy operation to complete
-    vkWaitForFences(device->getLogicalDevice(), 1, &copyFence, VK_TRUE, UINT64_MAX);
-
-    // Clean up the fence and command buffer
-    vkDestroyFence(device->getLogicalDevice(), copyFence, nullptr);
-    vkFreeCommandBuffers(device->getLogicalDevice(), device->getCommandPool() , 1, &commandBuffer);
-}
-
-void Renderer::addMesh(std::shared_ptr<Mesh> mesh) {
+void Renderer::addMesh(std::shared_ptr<Mesh> mesh) 
+{
     meshes.push_back(mesh);
+
+    // Create a uniform buffer for the new mesh
+    VkDeviceSize bufferSize = sizeof(MVP);
+    VkBuffer uniformBuffer;
+    VkDeviceMemory uniformBufferMemory;
+
+    createBuffer(device->getLogicalDevice(), device->getPhysicalDevice(), bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        uniformBuffer, uniformBufferMemory);
+
+    uniformBuffers.push_back(uniformBuffer);
+    uniformBuffersMemory.push_back(uniformBufferMemory);
 }
 
-void Renderer::cleanupSwapchain() {
+void Renderer::cleanupSwapchain() 
+{
     // Destroy framebuffers for each swapchain image view
     for (auto framebuffer : framebuffers) {
         vkDestroyFramebuffer(device->getLogicalDevice(), framebuffer, nullptr);
@@ -287,7 +259,8 @@ void Renderer::cleanupSwapchain() {
 
 
 // Create the render pass
-void Renderer::createRenderPass() {
+void Renderer::createRenderPass() 
+{
     VkAttachmentDescription colorAttachment{};
     colorAttachment.format = swapchain->getImageFormat();               // Format of the swapchain image
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;                    // Number of samples to write for multisampling
@@ -345,9 +318,29 @@ void Renderer::createRenderPass() {
     }
 }
 
+void Renderer::createDescriptorSetLayout()
+{
+    VkDescriptorSetLayoutBinding mvpLayoutBinding{};
+    mvpLayoutBinding.binding = 0; // Binding point in shader, the binding number in shader.
+    mvpLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    mvpLayoutBinding.descriptorCount = 1;
+    mvpLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    mvpLayoutBinding.pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 1;
+    layoutInfo.pBindings = &mvpLayoutBinding;
+
+    if (vkCreateDescriptorSetLayout(device->getLogicalDevice(), &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create descriptor set layout!");
+    }
+}
+
 
 // Create the pipeline
-void Renderer::createGraphicsPipeline() {
+void Renderer::createGraphicsPipeline() 
+{
     // Shader stages.
     VkPipelineShaderStageCreateInfo shaderStages[2];
     shaderStages[0] = createShaderStage("shaders/vertex_shader.spv", VK_SHADER_STAGE_VERTEX_BIT);
@@ -399,7 +392,7 @@ void Renderer::createGraphicsPipeline() {
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
     rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
 
     // Multisample state
@@ -436,6 +429,8 @@ void Renderer::createGraphicsPipeline() {
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.pushConstantRangeCount = 0;
     pipelineLayoutInfo.pPushConstantRanges = nullptr;
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
     // Add descriptor set layouts if you have any
     if (vkCreatePipelineLayout(device->getLogicalDevice(), &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create pipeline layout!");
@@ -474,7 +469,8 @@ void Renderer::createGraphicsPipeline() {
 }
 
 // Create framebuffers for each swapchain image view
-void Renderer::createFramebuffers() {
+void Renderer::createFramebuffers() 
+{
     framebuffers.resize(swapchain->getImageCount());
 
     for (size_t i = 0; i < framebuffers.size(); i++) {
@@ -495,7 +491,8 @@ void Renderer::createFramebuffers() {
     }
 }
 
-void Renderer::createCommandBuffers() {
+void Renderer::createCommandBuffers() 
+{
     commandBuffers.resize(framebuffers.size());
 
     VkCommandBufferAllocateInfo allocInfo{};
@@ -510,7 +507,8 @@ void Renderer::createCommandBuffers() {
 }
 
 // Create semaphores and fences for frame synchronization
-void Renderer::createSyncObjects() {
+void Renderer::createSyncObjects()
+{
     // Ensure the vectors have the correct size
     imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
     renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
@@ -533,8 +531,85 @@ void Renderer::createSyncObjects() {
     }
 }
 
+void Renderer::createDescriptorPool()
+{
+    VkDescriptorPoolSize poolSize = {};
+    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSize.descriptorCount = static_cast<uint32_t>(uniformBuffers.size());
 
-VkPipelineShaderStageCreateInfo Renderer::createShaderStage(const std::string& filepath, VkShaderStageFlagBits stage) {
+    VkDescriptorPoolCreateInfo poolCreateInfo = {};
+    poolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolCreateInfo.maxSets = static_cast<uint32_t>(uniformBuffers.size());
+    poolCreateInfo.poolSizeCount = 1;
+    poolCreateInfo.pPoolSizes = &poolSize;
+    
+    VkResult result = vkCreateDescriptorPool(device->getLogicalDevice(), &poolCreateInfo, nullptr, &descriptorPool);
+    if (result != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create a descriptor pool!");
+    }
+}
+
+void Renderer::createDescriptorSets()
+{
+    descriptorSets.resize(uniformBuffers.size());
+
+    std::vector<VkDescriptorSetLayout> setLayouts(uniformBuffers.size(), descriptorSetLayout);
+
+    VkDescriptorSetAllocateInfo setAllocInfo = {};
+    setAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    setAllocInfo.descriptorPool = descriptorPool;
+    setAllocInfo.descriptorSetCount = static_cast<uint32_t>(uniformBuffers.size());
+    setAllocInfo.pSetLayouts = setLayouts.data();
+
+    // Alocate descriptor sets
+    VkResult result = vkAllocateDescriptorSets(device->getLogicalDevice(), &setAllocInfo, descriptorSets.data());
+    if (result != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to allocate descriptor sets!");
+    }
+
+    // Update all of descriptor set buffer bindings
+    for (size_t i = 0; i < uniformBuffers.size(); ++i)
+    {
+        VkDescriptorBufferInfo mvpBufferInfo = {};
+        mvpBufferInfo.buffer = uniformBuffers[i];
+        mvpBufferInfo.offset = 0;
+        mvpBufferInfo.range = sizeof(MVP);
+
+        VkWriteDescriptorSet mvpSetWrite = {};
+        mvpSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        mvpSetWrite.dstSet = descriptorSets[i];
+        mvpSetWrite.dstBinding = 0;
+        mvpSetWrite.dstArrayElement = 0;
+        mvpSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        mvpSetWrite.descriptorCount = 1;
+        mvpSetWrite.pBufferInfo = &mvpBufferInfo;
+
+        // update the descriptor sets with new buffer/binding info.
+        vkUpdateDescriptorSets(device->getLogicalDevice(), 1, &mvpSetWrite, 0, nullptr);
+    }
+}
+
+void Renderer::updateUniformBuffer(uint32_t imageIndex)
+{
+    if (uniformBuffersMemory.empty() || imageIndex >= uniformBuffersMemory.size()) {
+        // Skip updating if no uniform buffers are available or index is out of range
+        return;
+    }
+
+    void* data;
+    VkResult result = vkMapMemory(device->getLogicalDevice(), uniformBuffersMemory[imageIndex], 0, sizeof(MVP), 0, &data);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error("Failed to map uniform buffer memory!");
+    }
+    memcpy(data, &mvp, sizeof(MVP));
+    vkUnmapMemory(device->getLogicalDevice(), uniformBuffersMemory[imageIndex]);
+}
+
+
+VkPipelineShaderStageCreateInfo Renderer::createShaderStage(const std::string& filepath, VkShaderStageFlagBits stage)
+{
     // Read the shader code from file
     std::ifstream file(filepath, std::ios::ate | std::ios::binary);
     if (!file.is_open()) {
@@ -572,59 +647,124 @@ VkPipelineShaderStageCreateInfo Renderer::createShaderStage(const std::string& f
     return shaderStageInfo; // Return the created shader stage info
 }
 
-void Renderer::cleanup() {
-    // Destroy graphics pipeline
-    if (graphicsPipeline != VK_NULL_HANDLE) {
-        vkDestroyPipeline(device->getLogicalDevice(), graphicsPipeline, nullptr);
-        graphicsPipeline = VK_NULL_HANDLE;
-    }
-
-    // Destroy pipeline layout
-    if (pipelineLayout != VK_NULL_HANDLE) {
-        vkDestroyPipelineLayout(device->getLogicalDevice(), pipelineLayout, nullptr);
-        pipelineLayout = VK_NULL_HANDLE;
-    }
-
-    // Destroy render pass
-    if (renderPass != VK_NULL_HANDLE) {
-        vkDestroyRenderPass(device->getLogicalDevice(), renderPass, nullptr);
-        renderPass = VK_NULL_HANDLE;
-    }
-
-    // Destroy framebuffers
-    for (auto framebuffer : framebuffers) {
-        if (framebuffer != VK_NULL_HANDLE) {
-            vkDestroyFramebuffer(device->getLogicalDevice(), framebuffer, nullptr);
+void Renderer::cleanup()
+{
+    
+    if (device)
+    {
+        if (descriptorPool != VK_NULL_HANDLE) 
+        {
+            Logger::info("Destroying descriptor pool.");
+            vkDestroyDescriptorPool(device->getLogicalDevice(), descriptorPool, nullptr);
+            descriptorPool = VK_NULL_HANDLE;
         }
-    }
-    framebuffers.clear();
+        else {
+            Logger::warning("Descriptor pool is already null.");
+        }
 
-    // Cleanup synchronization objects (semaphores and fences)
-    for (size_t i = 0; i < inFlightFences.size(); i++) {
-        if (renderFinishedSemaphores[i] != VK_NULL_HANDLE) {
-            vkDestroySemaphore(device->getLogicalDevice(), renderFinishedSemaphores[i], nullptr);
+        if (descriptorSetLayout != VK_NULL_HANDLE)
+        {
+            Logger::info("Destroying descriptor set layout.");
+            vkDestroyDescriptorSetLayout(device->getLogicalDevice(), descriptorSetLayout, nullptr);
+            descriptorSetLayout = VK_NULL_HANDLE;
         }
-        if (imageAvailableSemaphores[i] != VK_NULL_HANDLE) {
-            vkDestroySemaphore(device->getLogicalDevice(), imageAvailableSemaphores[i], nullptr);
+        else {
+            Logger::warning("Descriptor set layout is already null.");
         }
-        if (inFlightFences[i] != VK_NULL_HANDLE) {
-            vkDestroyFence(device->getLogicalDevice(), inFlightFences[i], nullptr);
-        }
-    }
-    renderFinishedSemaphores.clear();
-    imageAvailableSemaphores.clear();
-    inFlightFences.clear();
 
-    // Destroy shader modules
-    for (auto shaderModule : shaderModules) {
-        if (shaderModule != VK_NULL_HANDLE) {
-            vkDestroyShaderModule(device->getLogicalDevice(), shaderModule, nullptr);
+        for (size_t i = 0; i < uniformBuffers.size(); ++i)
+        {
+            if (uniformBuffers[i] != VK_NULL_HANDLE) 
+            {
+                Logger::info("Destroying uniform buffer at index " + std::to_string(i));
+                vkDestroyBuffer(device->getLogicalDevice(), uniformBuffers[i], nullptr);
+                uniformBuffers[i] = VK_NULL_HANDLE;
+            }
+            else {
+                Logger::warning("Uniform buffer at index " + std::to_string(i) + " is already null.");
+            }
         }
-    }
-    shaderModules.clear();
 
-    for (auto& mesh : meshes) {
-        mesh.reset();
+        for (size_t i = 0; i < uniformBuffersMemory.size(); ++i) 
+        {
+            if (uniformBuffersMemory[i] != VK_NULL_HANDLE)
+            {
+                Logger::info("Freeing uniform buffer memory at index " + std::to_string(i));
+                vkFreeMemory(device->getLogicalDevice(), uniformBuffersMemory[i], nullptr);
+                uniformBuffersMemory[i] = VK_NULL_HANDLE;
+            }
+            else {
+                Logger::warning("Uniform buffer memory at index " + std::to_string(i) + " is already null.");
+            }
+        }
+
+        // Destroy graphics pipeline
+        if (graphicsPipeline != VK_NULL_HANDLE) 
+        {
+            vkDestroyPipeline(device->getLogicalDevice(), graphicsPipeline, nullptr);
+            graphicsPipeline = VK_NULL_HANDLE;
+        }
+
+        // Destroy pipeline layout
+        if (pipelineLayout != VK_NULL_HANDLE)
+        {
+            vkDestroyPipelineLayout(device->getLogicalDevice(), pipelineLayout, nullptr);
+            pipelineLayout = VK_NULL_HANDLE;
+        }
+
+        // Destroy render pass
+        if (renderPass != VK_NULL_HANDLE) 
+        {
+            vkDestroyRenderPass(device->getLogicalDevice(), renderPass, nullptr);
+            renderPass = VK_NULL_HANDLE;
+        }
+
+        // Destroy framebuffers
+        for (auto framebuffer : framebuffers) 
+        {
+            if (framebuffer != VK_NULL_HANDLE)
+            {
+                vkDestroyFramebuffer(device->getLogicalDevice(), framebuffer, nullptr);
+            }
+        }
+        framebuffers.clear();
+
+        // Cleanup synchronization objects (semaphores and fences)
+        for (size_t i = 0; i < inFlightFences.size(); i++) 
+        {
+            if (renderFinishedSemaphores[i] != VK_NULL_HANDLE) 
+            {
+                vkDestroySemaphore(device->getLogicalDevice(), renderFinishedSemaphores[i], nullptr);
+            }
+            if (imageAvailableSemaphores[i] != VK_NULL_HANDLE) 
+            {
+                vkDestroySemaphore(device->getLogicalDevice(), imageAvailableSemaphores[i], nullptr);
+            }
+            if (inFlightFences[i] != VK_NULL_HANDLE) 
+            {
+                vkDestroyFence(device->getLogicalDevice(), inFlightFences[i], nullptr);
+            }
+        }
+        renderFinishedSemaphores.clear();
+        imageAvailableSemaphores.clear();
+        inFlightFences.clear();
+
+        // Destroy shader modules
+        for (auto shaderModule : shaderModules)
+        {
+            if (shaderModule != VK_NULL_HANDLE) 
+            {
+                vkDestroyShaderModule(device->getLogicalDevice(), shaderModule, nullptr);
+            }
+        }
+        shaderModules.clear();
+
+        for (auto& mesh : meshes) 
+        {
+            mesh.reset();
+        }
+        meshes.clear();
+
+        this->device = nullptr;
     }
-    meshes.clear();
 }

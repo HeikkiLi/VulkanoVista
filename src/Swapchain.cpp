@@ -1,7 +1,8 @@
 #include "Swapchain.h"
 
 
-void Swapchain::create(Device* device, VkSurfaceKHR surface, VkExtent2D windowExtent) {
+void Swapchain::create(Device* device, VkSurfaceKHR surface, VkExtent2D windowExtent) 
+{
     this->device = device;
 
     // Query surface capabilities
@@ -34,7 +35,8 @@ void Swapchain::create(Device* device, VkSurfaceKHR surface, VkExtent2D windowEx
     QueueFamilyIndices indices = device->findQueueFamilies(device->getPhysicalDevice(), surface);
     uint32_t queueFamilyIndices[] = { indices.graphicsFamily.value(), indices.presentFamily.value() };
 
-    if (indices.graphicsFamily != indices.presentFamily) {
+    if (indices.graphicsFamily != indices.presentFamily)
+    {
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         createInfo.queueFamilyIndexCount = 2;
         createInfo.pQueueFamilyIndices = queueFamilyIndices;
@@ -52,7 +54,8 @@ void Swapchain::create(Device* device, VkSurfaceKHR surface, VkExtent2D windowEx
     // Create the swapchain
     VkResult result = vkCreateSwapchainKHR(device->getLogicalDevice(), &createInfo, nullptr, &swapchain);
     
-    if (result != VK_SUCCESS) {
+    if (result != VK_SUCCESS)
+    {
         std::cerr << "Failed to create swapchain! Error code: " << result << std::endl;
         throw std::runtime_error("Failed to create swapchain!");
     }
@@ -65,7 +68,8 @@ void Swapchain::create(Device* device, VkSurfaceKHR surface, VkExtent2D windowEx
 
     // Create image views for each image in the swapchain
     swapchainImageViews.resize(swapchainImages.size());
-    for (size_t i = 0; i < swapchainImages.size(); i++) {
+    for (size_t i = 0; i < swapchainImages.size(); i++) 
+    {
         VkImageViewCreateInfo viewInfo{};
         viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         viewInfo.image = swapchainImages[i];
@@ -81,7 +85,8 @@ void Swapchain::create(Device* device, VkSurfaceKHR surface, VkExtent2D windowEx
         viewInfo.subresourceRange.baseArrayLayer = 0;
         viewInfo.subresourceRange.layerCount = 1;
 
-        if (vkCreateImageView(device->getLogicalDevice(), &viewInfo, nullptr, &swapchainImageViews[i]) != VK_SUCCESS) {
+        if (vkCreateImageView(device->getLogicalDevice(), &viewInfo, nullptr, &swapchainImageViews[i]) != VK_SUCCESS) 
+        {
             throw std::runtime_error("Failed to create image views!");
         }
     }
@@ -89,13 +94,15 @@ void Swapchain::create(Device* device, VkSurfaceKHR surface, VkExtent2D windowEx
 
 void Swapchain::cleanup() {
     // Destroy image views for each swapchain image
-    for (auto imageView : swapchainImageViews) {
+    for (auto imageView : swapchainImageViews)
+    {
         vkDestroyImageView(device->getLogicalDevice(), imageView, nullptr);
     }
     swapchainImageViews.clear();
 
     // Destroy the swapchain
-    if (swapchain != VK_NULL_HANDLE) {
+    if (swapchain != VK_NULL_HANDLE) 
+    {
         vkDestroySwapchainKHR(device->getLogicalDevice(), swapchain, nullptr);
         swapchain = VK_NULL_HANDLE;
     }
@@ -109,21 +116,24 @@ uint32_t Swapchain::getImageCount() const
 
 VkImageView Swapchain::getImageView(size_t index) const
 {
-    if (index >= swapchainImageViews.size()) {
+    if (index >= swapchainImageViews.size()) 
+    {
         throw std::out_of_range("Requested image view index is out of range.");
     }
     return swapchainImageViews[index];
 }
 
 // Helper to choose the best surface format from available options
-VkSurfaceFormatKHR Swapchain::chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
+VkSurfaceFormatKHR Swapchain::chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) 
+{
     
     if (availableFormats.size() == 1 && availableFormats[0].format == VK_FORMAT_UNDEFINED)
     {
         return { VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
     }
 
-    for (const auto& availableFormat : availableFormats) {
+    for (const auto& availableFormat : availableFormats) 
+    {
         if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
             availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
             return availableFormat;
@@ -131,7 +141,8 @@ VkSurfaceFormatKHR Swapchain::chooseSurfaceFormat(const std::vector<VkSurfaceFor
     }
 
     // Fallback to a commonly supported format
-    for (const auto& availableFormat : availableFormats) {
+    for (const auto& availableFormat : availableFormats) 
+    {
         if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM) {
             return availableFormat;
         }
@@ -141,9 +152,12 @@ VkSurfaceFormatKHR Swapchain::chooseSurfaceFormat(const std::vector<VkSurfaceFor
 }
 
 // Helper to choose the best present mode
-VkPresentModeKHR Swapchain::choosePresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) {
-    for (const auto& availablePresentMode : availablePresentModes) {
-        if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+VkPresentModeKHR Swapchain::choosePresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) 
+{
+    for (const auto& availablePresentMode : availablePresentModes) 
+    {
+        if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) 
+        {
             return availablePresentMode;
         }
     }
@@ -151,8 +165,10 @@ VkPresentModeKHR Swapchain::choosePresentMode(const std::vector<VkPresentModeKHR
 }
 
 // Helper to choose the appropriate swap extent based on window and surface capabilities
-VkExtent2D Swapchain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, int width, int height) {
-    if (capabilities.currentExtent.width != UINT32_MAX) {
+VkExtent2D Swapchain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, int width, int height)
+{
+    if (capabilities.currentExtent.width != UINT32_MAX)
+    {
         return capabilities.currentExtent;
     }
     else {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
+#include <glm/glm.hpp>
 #include <string>
 #include <vector>
 #include <memory>
@@ -17,21 +18,26 @@ class Renderer
 public:
     ~Renderer();
     void setup(Device* device, Swapchain* swapchain, Window* window);
+    void finalizeSetup();
     void drawFrame();
+    void update(float deltaTime);
     void cleanup();
     
     void recreateSwapchain(VkExtent2D newExtent);
-
-    VkBuffer createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkDeviceMemory& bufferMemory);
-    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
     void addMesh(std::shared_ptr<Mesh> mesh);
 
 private:
     void createRenderPass();
+    void createDescriptorSetLayout();
     void createGraphicsPipeline();
     void createFramebuffers();
     void createCommandBuffers();
     void createSyncObjects();
+
+    void createDescriptorPool();
+    void createDescriptorSets();
+
+    void updateUniformBuffer(uint32_t imageIndex);
     
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
     
@@ -69,5 +75,21 @@ private:
 
 
     std::vector<std::shared_ptr<Mesh>> meshes;
+
+    // Descriptors
+    VkDescriptorSetLayout descriptorSetLayout;
+
+    VkDescriptorPool descriptorPool;
+    std::vector<VkDescriptorSet> descriptorSets;
+
+    // one uniform buffer for every swapchain image
+    std::vector<VkBuffer> uniformBuffers;
+    std::vector<VkDeviceMemory> uniformBuffersMemory;
+
+    struct MVP {
+        glm::mat4 projection;
+        glm::mat4 view;
+        glm::mat4 model;
+    } mvp;
 
 };
