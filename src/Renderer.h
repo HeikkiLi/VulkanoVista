@@ -12,6 +12,7 @@ class Device;
 class Swapchain;
 class Window;
 class Mesh;
+struct UboModel;
 
 class Renderer
 {
@@ -37,13 +38,16 @@ private:
     void createDescriptorPool();
     void createDescriptorSets();
 
-    void updateUniformBuffer(uint32_t imageIndex);
+    void createUniformBuffers();
+    void updateUniformBuffers(uint32_t imageIndex);
     
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
     
     void cleanupSwapchain();
 
     VkPipelineShaderStageCreateInfo createShaderStage(const std::string& filepath, VkShaderStageFlagBits stage);
+
+    void allocateDynamicBufferTransferSpace();
 
     //void createVertexBuffer();
 
@@ -82,14 +86,22 @@ private:
     VkDescriptorPool descriptorPool;
     std::vector<VkDescriptorSet> descriptorSets;
 
-    // one uniform buffer for every swapchain image
-    std::vector<VkBuffer> uniformBuffers;
-    std::vector<VkDeviceMemory> uniformBuffersMemory;
+    // View Projection uniform buffer for every swapchain image
+    std::vector<VkBuffer> vpUniformBuffers;
+    std::vector<VkDeviceMemory> vpUniformBuffersMemory;
 
-    struct MVP {
+    // Model dynamic uniform buffers
+    std::vector<VkBuffer> modelDynUniformBuffers;
+    std::vector<VkDeviceMemory> modelDynUniformBuffersMemory;
+
+    VkDeviceSize minUniformBufferOffset;
+    size_t modelUniformAlignment;
+
+    UboModel* modelTransferSpace;
+
+    struct UboViewProjection {
         glm::mat4 projection;
         glm::mat4 view;
-        glm::mat4 model;
-    } mvp;
+    } uboViewProjection;
 
 };

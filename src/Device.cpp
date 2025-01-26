@@ -1,5 +1,6 @@
 #include "Device.h"
 #include "Logger.h"
+#include "Mesh.h"
 
 
 void Device::pickPhysicalDevice(const Instance& instance, VkSurfaceKHR surface) 

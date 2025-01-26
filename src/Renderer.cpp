@@ -35,17 +35,22 @@ void Renderer::setup(Device* device,  Swapchain* swapchain, Window* window)
     createFramebuffers();
 
     createCommandBuffers();
-//    createDescriptorPool();
-//    createDescriptorSets();
 
     createSyncObjects();
 
-    // TODO refactor to mesh the mesh transform, and the camera
-    mvp.projection = glm::perspective(glm::radians(45.0f), (float)swapchain->getExtent().width / (float)swapchain->getExtent().height, 0.1f, 100.0f);
-    mvp.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    mvp.model = glm::mat4(1.0f); // object position in world, now leave as they are.
+    // Set minimum uniform buffer offset
+    VkPhysicalDeviceProperties deviceProperties;
+    vkGetPhysicalDeviceProperties(device->getPhysicalDevice(), &deviceProperties);
+    minUniformBufferOffset = deviceProperties.limits.minUniformBufferOffsetAlignment;
+    allocateDynamicBufferTransferSpace();
 
-    mvp.projection[1][1] *= -1;
+    // view projection
+    uboViewProjection.projection = glm::perspective(glm::radians(45.0f), (float)swapchain->getExtent().width / (float)swapchain->getExtent().height, 0.1f, 100.0f);
+    uboViewProjection.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    
+    uboViewProjection.projection[1][1] *= -1;
+
+    createUniformBuffers();
 
 }
 
@@ -76,7 +81,7 @@ void Renderer::drawFrame()
         throw std::runtime_error("Failed to acquire swap chain image!");
     }
 
-    updateUniformBuffer(imageIndex);
+    updateUniformBuffers(imageIndex);
 
     // Record commands to command buffer (for this specific image)
     vkResetCommandBuffer(commandBuffers[imageIndex], 0);
@@ -133,11 +138,15 @@ void Renderer::update(float deltaTime)
     // Calculate rotation angle in radians based on deltaTime
     float rotationAngle = glm::radians(rotationSpeed * deltaTime);
 
-    // a rotation matrix
-    glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), rotationAngle, glm::vec3(0.0f, 0.0f, 1.0f));
+    for (size_t i = 0; i < meshes.size(); i++)
+    {
+        glm::mat4 model = meshes[i]->getModel().model;
 
-    // Apply rotation to the model matrix
-    mvp.model = rotation * mvp.model;
+        float direction = (i == 0) ? -1.0f : 1.0f;
+        model = glm::rotate(model, rotationAngle * direction, glm::vec3(0.0f, 0.0f, 1.0f));
+
+        meshes[i]->setModel(model);
+    }
 }
 
 
@@ -172,11 +181,17 @@ void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
     // Iterate over all meshes and draw them
     for (size_t i = 0; i < meshes.size(); i++) {
 
+        // Bind mesh index and vertex buffers       
+        meshes[i]->bind(commandBuffer);
+
+        // Dynamic offset amount
+        uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment) * i;
+
         // bind descriptor sets
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-            0, 1, &descriptorSets[i], 0, nullptr);
+            0, 1, &descriptorSets[i], 1, &dynamicOffset);
 
-        meshes[i]->bind(commandBuffer);  // Bind vertex and index buffers
+
         meshes[i]->draw(commandBuffer);  // Issue indexed draw call
     }
 
@@ -206,18 +221,6 @@ void Renderer::recreateSwapchain(VkExtent2D windowExtent)
 void Renderer::addMesh(std::shared_ptr<Mesh> mesh) 
 {
     meshes.push_back(mesh);
-
-    // Create a uniform buffer for the new mesh
-    VkDeviceSize bufferSize = sizeof(MVP);
-    VkBuffer uniformBuffer;
-    VkDeviceMemory uniformBufferMemory;
-
-    createBuffer(device->getLogicalDevice(), device->getPhysicalDevice(), bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        uniformBuffer, uniformBufferMemory);
-
-    uniformBuffers.push_back(uniformBuffer);
-    uniformBuffersMemory.push_back(uniformBufferMemory);
 }
 
 void Renderer::cleanupSwapchain() 
@@ -320,17 +323,27 @@ void Renderer::createRenderPass()
 
 void Renderer::createDescriptorSetLayout()
 {
-    VkDescriptorSetLayoutBinding mvpLayoutBinding{};
-    mvpLayoutBinding.binding = 0; // Binding point in shader, the binding number in shader.
-    mvpLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    mvpLayoutBinding.descriptorCount = 1;
-    mvpLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    mvpLayoutBinding.pImmutableSamplers = nullptr;
+    VkDescriptorSetLayoutBinding vpLayoutBinding{};
+    vpLayoutBinding.binding = 0; // Binding point in shader, the binding number in shader.
+    vpLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    vpLayoutBinding.descriptorCount = 1;
+    vpLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    vpLayoutBinding.pImmutableSamplers = nullptr;
+
+    // Model binding indo
+    VkDescriptorSetLayoutBinding modelLayoutBinding = {};
+    modelLayoutBinding.binding = 1;
+    modelLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    modelLayoutBinding.descriptorCount = 1;
+    modelLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    modelLayoutBinding.pImmutableSamplers = nullptr;
+
+    std::vector< VkDescriptorSetLayoutBinding> layoutBindings = { vpLayoutBinding, modelLayoutBinding };
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 1;
-    layoutInfo.pBindings = &mvpLayoutBinding;
+    layoutInfo.bindingCount = static_cast<uint32_t>(layoutBindings.size());
+    layoutInfo.pBindings = layoutBindings.data();
 
     if (vkCreateDescriptorSetLayout(device->getLogicalDevice(), &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create descriptor set layout!");
@@ -533,15 +546,23 @@ void Renderer::createSyncObjects()
 
 void Renderer::createDescriptorPool()
 {
-    VkDescriptorPoolSize poolSize = {};
-    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSize.descriptorCount = static_cast<uint32_t>(uniformBuffers.size());
+    // ViewProjection pool
+    VkDescriptorPoolSize vpPoolSize = {};
+    vpPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    vpPoolSize.descriptorCount = static_cast<uint32_t>(vpUniformBuffers.size());
+
+    // Model pool dynamic
+    VkDescriptorPoolSize modelPoolSize = {};
+    modelPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    modelPoolSize.descriptorCount = static_cast<uint32_t>(modelDynUniformBuffers.size());
+
+    std::vector<VkDescriptorPoolSize> descriptorPoolSizes = { vpPoolSize, modelPoolSize };
 
     VkDescriptorPoolCreateInfo poolCreateInfo = {};
     poolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolCreateInfo.maxSets = static_cast<uint32_t>(uniformBuffers.size());
-    poolCreateInfo.poolSizeCount = 1;
-    poolCreateInfo.pPoolSizes = &poolSize;
+    poolCreateInfo.maxSets = static_cast<uint32_t>(swapchain->getImageCount());
+    poolCreateInfo.poolSizeCount = static_cast<uint32_t>(descriptorPoolSizes.size());
+    poolCreateInfo.pPoolSizes = descriptorPoolSizes.data();
     
     VkResult result = vkCreateDescriptorPool(device->getLogicalDevice(), &poolCreateInfo, nullptr, &descriptorPool);
     if (result != VK_SUCCESS)
@@ -552,14 +573,14 @@ void Renderer::createDescriptorPool()
 
 void Renderer::createDescriptorSets()
 {
-    descriptorSets.resize(uniformBuffers.size());
+    descriptorSets.resize(swapchain->getImageCount());
 
-    std::vector<VkDescriptorSetLayout> setLayouts(uniformBuffers.size(), descriptorSetLayout);
+    std::vector<VkDescriptorSetLayout> setLayouts(swapchain->getImageCount(), descriptorSetLayout);
 
     VkDescriptorSetAllocateInfo setAllocInfo = {};
     setAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     setAllocInfo.descriptorPool = descriptorPool;
-    setAllocInfo.descriptorSetCount = static_cast<uint32_t>(uniformBuffers.size());
+    setAllocInfo.descriptorSetCount = static_cast<uint32_t>(swapchain->getImageCount());
     setAllocInfo.pSetLayouts = setLayouts.data();
 
     // Alocate descriptor sets
@@ -570,41 +591,105 @@ void Renderer::createDescriptorSets()
     }
 
     // Update all of descriptor set buffer bindings
-    for (size_t i = 0; i < uniformBuffers.size(); ++i)
+    for (size_t i = 0; i < swapchain->getImageCount(); ++i)
     {
-        VkDescriptorBufferInfo mvpBufferInfo = {};
-        mvpBufferInfo.buffer = uniformBuffers[i];
-        mvpBufferInfo.offset = 0;
-        mvpBufferInfo.range = sizeof(MVP);
+        // ViewProjection Descriptor.
+        VkDescriptorBufferInfo vpBufferInfo = {};
+        vpBufferInfo.buffer = vpUniformBuffers[i];
+        vpBufferInfo.offset = 0;
+        vpBufferInfo.range = sizeof(UboViewProjection);
 
-        VkWriteDescriptorSet mvpSetWrite = {};
-        mvpSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        mvpSetWrite.dstSet = descriptorSets[i];
-        mvpSetWrite.dstBinding = 0;
-        mvpSetWrite.dstArrayElement = 0;
-        mvpSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        mvpSetWrite.descriptorCount = 1;
-        mvpSetWrite.pBufferInfo = &mvpBufferInfo;
+        VkWriteDescriptorSet vpSetWrite = {};
+        vpSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        vpSetWrite.dstSet = descriptorSets[i];
+        vpSetWrite.dstBinding = 0;
+        vpSetWrite.dstArrayElement = 0;
+        vpSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        vpSetWrite.descriptorCount = 1;
+        vpSetWrite.pBufferInfo = &vpBufferInfo;
+
+        // Model descriptor.
+        VkDescriptorBufferInfo modelBufferInfo = {};
+        modelBufferInfo.buffer = modelDynUniformBuffers[i];
+        modelBufferInfo.offset = 0;
+        modelBufferInfo.range = modelUniformAlignment;
+
+        VkWriteDescriptorSet modelSetWrite = {};
+        modelSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        modelSetWrite.dstSet = descriptorSets[i];
+        modelSetWrite.dstBinding = 1;
+        modelSetWrite.dstArrayElement = 0;
+        modelSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+        modelSetWrite.descriptorCount = 1;
+        modelSetWrite.pBufferInfo = &modelBufferInfo;
+
+        std::vector< VkWriteDescriptorSet> setWrites = { vpSetWrite, modelSetWrite };
 
         // update the descriptor sets with new buffer/binding info.
-        vkUpdateDescriptorSets(device->getLogicalDevice(), 1, &mvpSetWrite, 0, nullptr);
+        vkUpdateDescriptorSets(device->getLogicalDevice(),
+                                static_cast<uint32_t>(setWrites.size()), 
+                                setWrites.data(), 
+                                0, nullptr);
     }
 }
 
-void Renderer::updateUniformBuffer(uint32_t imageIndex)
+void Renderer::createUniformBuffers()
 {
-    if (uniformBuffersMemory.empty() || imageIndex >= uniformBuffersMemory.size()) {
+    // viewProjection buffer size.
+    VkDeviceSize vpBufferSize = sizeof(UboViewProjection);
+
+    // model buffer size
+    VkDeviceSize modelBufferSize = modelUniformAlignment * MAX_OBJECTS;
+
+    vpUniformBuffers.resize(swapchain->getImageCount());
+    vpUniformBuffersMemory.resize(swapchain->getImageCount());
+
+    modelDynUniformBuffers.resize(swapchain->getImageCount());
+    modelDynUniformBuffersMemory.resize(swapchain->getImageCount());
+
+    for (size_t i = 0; i < swapchain->getImageCount(); ++i)
+    {
+        createBuffer(device->getLogicalDevice(), device->getPhysicalDevice(), vpBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            vpUniformBuffers[i], vpUniformBuffersMemory[i]);
+
+        createBuffer(device->getLogicalDevice(), device->getPhysicalDevice(), modelBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            modelDynUniformBuffers[i], modelDynUniformBuffersMemory[i]);
+    }
+
+}
+
+void Renderer::updateUniformBuffers(uint32_t imageIndex)
+{
+    if (vpUniformBuffersMemory.empty() || imageIndex >= vpUniformBuffersMemory.size()) {
         // Skip updating if no uniform buffers are available or index is out of range
         return;
     }
 
+    // ViewProjection data
     void* data;
-    VkResult result = vkMapMemory(device->getLogicalDevice(), uniformBuffersMemory[imageIndex], 0, sizeof(MVP), 0, &data);
+    VkResult result = vkMapMemory(device->getLogicalDevice(), vpUniformBuffersMemory[imageIndex], 0, sizeof(UboViewProjection), 0, &data);
     if (result != VK_SUCCESS) {
         throw std::runtime_error("Failed to map uniform buffer memory!");
     }
-    memcpy(data, &mvp, sizeof(MVP));
-    vkUnmapMemory(device->getLogicalDevice(), uniformBuffersMemory[imageIndex]);
+    memcpy(data, &uboViewProjection, sizeof(UboViewProjection));
+    vkUnmapMemory(device->getLogicalDevice(), vpUniformBuffersMemory[imageIndex]);
+
+    // Model data
+    for (size_t i = 0; i < meshes.size(); ++i)
+    {
+        UboModel* model = (UboModel*)((uint64_t)modelTransferSpace + (i * modelUniformAlignment));
+        *model = meshes[i]->getModel();
+    }
+
+    result = vkMapMemory(device->getLogicalDevice(), modelDynUniformBuffersMemory[imageIndex], 0, modelUniformAlignment * meshes.size(), 0, &data);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error("Failed to map model uniform buffer memory!");
+    }
+    memcpy(data, modelTransferSpace, modelUniformAlignment * meshes.size());
+    vkUnmapMemory(device->getLogicalDevice(), modelDynUniformBuffersMemory[imageIndex]);
+
 }
 
 
@@ -647,9 +732,27 @@ VkPipelineShaderStageCreateInfo Renderer::createShaderStage(const std::string& f
     return shaderStageInfo; // Return the created shader stage info
 }
 
+void Renderer::allocateDynamicBufferTransferSpace()
+{
+    modelUniformAlignment = (sizeof(UboModel) + minUniformBufferOffset - 1) & ~(minUniformBufferOffset - 1);
+
+    // create space in memory to hold dynamic buffer aligned to required alignment and hold max objects.
+    modelTransferSpace = (UboModel*)_aligned_malloc(modelUniformAlignment * MAX_OBJECTS, modelUniformAlignment);
+    if (!modelTransferSpace) {
+        throw std::runtime_error("Failed to allocate aligned memory for modelTransferSpace.");
+    }
+}
+
+
+
 void Renderer::cleanup()
 {
     
+    if (modelTransferSpace) {
+        _aligned_free(modelTransferSpace);
+        modelTransferSpace = nullptr;
+    }
+
     if (device)
     {
         if (descriptorPool != VK_NULL_HANDLE) 
@@ -672,29 +775,55 @@ void Renderer::cleanup()
             Logger::warning("Descriptor set layout is already null.");
         }
 
-        for (size_t i = 0; i < uniformBuffers.size(); ++i)
+        for (size_t i = 0; i < vpUniformBuffers.size(); ++i)
         {
-            if (uniformBuffers[i] != VK_NULL_HANDLE) 
+            if (vpUniformBuffers[i] != VK_NULL_HANDLE) 
             {
                 Logger::info("Destroying uniform buffer at index " + std::to_string(i));
-                vkDestroyBuffer(device->getLogicalDevice(), uniformBuffers[i], nullptr);
-                uniformBuffers[i] = VK_NULL_HANDLE;
+                vkDestroyBuffer(device->getLogicalDevice(), vpUniformBuffers[i], nullptr);
+                vpUniformBuffers[i] = VK_NULL_HANDLE;
             }
             else {
-                Logger::warning("Uniform buffer at index " + std::to_string(i) + " is already null.");
+                Logger::warning("VP Uniform buffer at index " + std::to_string(i) + " is already null.");
             }
         }
 
-        for (size_t i = 0; i < uniformBuffersMemory.size(); ++i) 
+        for (size_t i = 0; i < vpUniformBuffersMemory.size(); ++i) 
         {
-            if (uniformBuffersMemory[i] != VK_NULL_HANDLE)
+            if (vpUniformBuffersMemory[i] != VK_NULL_HANDLE)
             {
                 Logger::info("Freeing uniform buffer memory at index " + std::to_string(i));
-                vkFreeMemory(device->getLogicalDevice(), uniformBuffersMemory[i], nullptr);
-                uniformBuffersMemory[i] = VK_NULL_HANDLE;
+                vkFreeMemory(device->getLogicalDevice(), vpUniformBuffersMemory[i], nullptr);
+                vpUniformBuffersMemory[i] = VK_NULL_HANDLE;
             }
             else {
-                Logger::warning("Uniform buffer memory at index " + std::to_string(i) + " is already null.");
+                Logger::warning("VP Uniform buffer memory at index " + std::to_string(i) + " is already null.");
+            }
+        }
+
+        for (size_t i = 0; i < modelDynUniformBuffers.size(); ++i)
+        {
+            if (modelDynUniformBuffers[i] != VK_NULL_HANDLE)
+            {
+                Logger::info("Destroying uniform buffer at index " + std::to_string(i));
+                vkDestroyBuffer(device->getLogicalDevice(), modelDynUniformBuffers[i], nullptr);
+                modelDynUniformBuffers[i] = VK_NULL_HANDLE;
+            }
+            else {
+                Logger::warning("Model dynamic Uniform buffer at index " + std::to_string(i) + " is already null.");
+            }
+        }
+
+        for (size_t i = 0; i < modelDynUniformBuffersMemory.size(); ++i)
+        {
+            if (modelDynUniformBuffersMemory[i] != VK_NULL_HANDLE)
+            {
+                Logger::info("Freeing uniform buffer memory at index " + std::to_string(i));
+                vkFreeMemory(device->getLogicalDevice(), modelDynUniformBuffersMemory[i], nullptr);
+                modelDynUniformBuffersMemory[i] = VK_NULL_HANDLE;
+            }
+            else {
+                Logger::warning("Model Dynamic Uniform buffer memory at index " + std::to_string(i) + " is already null.");
             }
         }
 

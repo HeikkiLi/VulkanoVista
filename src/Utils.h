@@ -4,6 +4,8 @@
 #include <stdexcept>
 #include <vector>
 
+const int MAX_OBJECTS = 2;
+
 // Function to find a suitable memory type index
 uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties, VkPhysicalDevice physicalDevice);
 
@@ -15,5 +17,3 @@ void createBuffer(VkDevice device,
     VkMemoryPropertyFlags properties,
     VkBuffer& buffer,
     VkDeviceMemory& bufferMemory);
-
-void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);

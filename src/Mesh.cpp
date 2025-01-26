@@ -4,9 +4,11 @@
 
 Mesh::Mesh(Device* device, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices)
     : device(device), vertexBuffer(VK_NULL_HANDLE), vertexBufferMemory(VK_NULL_HANDLE),
-    indexBuffer(VK_NULL_HANDLE), indexBufferMemory(VK_NULL_HANDLE), indexCount(indices.size()) {
+    indexBuffer(VK_NULL_HANDLE), indexBufferMemory(VK_NULL_HANDLE), indexCount(indices.size()), vertexCount(vertices.size()) {
     createVertexBuffer(vertices);
     createIndexBuffer(indices);
+    
+    uboModel.model = glm::mat4(1.0f);
 }
 
 
@@ -16,6 +18,16 @@ Mesh::~Mesh()
     vkFreeMemory(device->getLogicalDevice(), vertexBufferMemory, nullptr);
     vkDestroyBuffer(device->getLogicalDevice(), indexBuffer, nullptr);
     vkFreeMemory(device->getLogicalDevice(), indexBufferMemory, nullptr);
+}
+
+void Mesh::setModel(glm::mat4 model)
+{
+    uboModel.model = model;
+}
+
+UboModel Mesh::getModel()
+{
+    return uboModel;
 }
 
 

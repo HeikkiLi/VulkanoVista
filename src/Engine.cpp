@@ -5,6 +5,7 @@
 
 #include "Logger.h"
 #include "Mesh.h"
+#include <glm/ext/matrix_transform.hpp>
 
 int Engine::init()
 {
@@ -92,9 +93,9 @@ int Engine::initVulkan()
         renderer.setup(&device, &swapchain, &window);
 
         std::vector<Vertex> vertices = {
-           {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},  // Bottom vertex (red)
-           {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},   // Right vertex (green)
-           {{-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}}   // Left vertex (blue)
+           {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+           {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
+           {{-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}}
         };
 
         std::vector<uint32_t> indices = { 0, 1, 2 };
@@ -102,19 +103,29 @@ int Engine::initVulkan()
         // Create the mesh
         auto mesh = std::make_shared<Mesh>(&device, vertices, indices);
 
+        glm::mat4 model = mesh->getModel().model;
+        glm::vec3 offset = glm::vec3(-1.0f, 0.0f, -5.0f);
+        model = glm::translate(model, offset);
+        mesh->setModel(model);
+
         // Add the mesh to the renderer
         renderer.addMesh(mesh);
 
         std::vector<Vertex> vertices2 = {
-            {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},     // Bottom vertex (red)
-            {{-0.25f, 0.25f, 0.0f}, {0.0f, 1.0f, 0.0f}},    // Right vertex (green)
-            {{-0.75f, 0.25f, 0.0f}, {0.0f, 0.0f, 1.0f}}     // Left vertex (blue)
+            {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+            {{0.25f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
+            {{-0.25f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}}
         };
 
         std::vector<uint32_t> indices2 = { 0, 1, 2 };
-
+        
         // Create the mesh
         auto mesh2 = std::make_shared<Mesh>(&device, vertices2, indices2);
+
+        model = mesh2->getModel().model;
+        offset = glm::vec3(1.0f, 0.0f, -5.0f);
+        model = glm::translate(model, offset);
+        mesh2->setModel(model);
 
         // Add the mesh to the renderer
         renderer.addMesh(mesh2);
