@@ -12,22 +12,26 @@ Instance::~Instance()
 }
 
 
-std::vector<const char*> Instance::getRequiredExtensions(SDL_Window* window) {
+std::vector<const char*> Instance::getRequiredExtensions(SDL_Window* window)
+{
     unsigned extensionCount = 0;
-    if (!SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, nullptr)) {
+    if (!SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, nullptr)) 
+    {
         Logger::error("Could not get the number of required instance extensions from SDL.");
         throw std::runtime_error("Failed to get SDL Vulkan extensions.");
     }
 
     std::vector<const char*> extensions(extensionCount);
-    if (!SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, extensions.data())) {
+    if (!SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, extensions.data())) 
+    {
         Logger::error("Could not get the names of required instance extensions from SDL.");
         throw std::runtime_error("Failed to get SDL Vulkan extensions.");
     }
     return extensions;
 }
 
-std::vector<const char*> Instance::getValidationLayers() {
+std::vector<const char*> Instance::getValidationLayers() 
+{
     std::vector<const char*> layers;
 #if defined(_DEBUG)
     layers.push_back("VK_LAYER_KHRONOS_validation");
@@ -64,7 +68,8 @@ bool Instance::checkInstanceExtensionSupport(std::vector<const char*>* checkExte
     return true;
 }
 
-bool Instance::checkValidationLayerSupport(const std::vector<const char*>& validationLayers) {
+bool Instance::checkValidationLayerSupport(const std::vector<const char*>& validationLayers) 
+{
     uint32_t layerCount;
     vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
 

@@ -14,7 +14,8 @@ void Window::create(int width, int height, const std::string& title)
     Logger::info("Creating window with title: " + title);
 
     // Initialize SDL
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+    if (SDL_Init(SDL_INIT_VIDEO) != 0)
+    {
         Logger::error("Failed to initialize SDL: " + std::string(SDL_GetError()));
         throw std::runtime_error("Failed to initialize SDL");
     }
@@ -22,7 +23,8 @@ void Window::create(int width, int height, const std::string& title)
     // Create SDL window
     sdlWindow = SDL_CreateWindow(title.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         width, height, SDL_WINDOW_VULKAN);
-    if (!sdlWindow) {
+    if (!sdlWindow)
+    {
         Logger::error("Failed to create SDL window: " + std::string(SDL_GetError()));
         throw std::runtime_error("Failed to create SDL window");
     }
@@ -32,7 +34,8 @@ void Window::create(int width, int height, const std::string& title)
 
 void Window::createSurface(const Instance& instance) 
 {
-    if (!SDL_Vulkan_CreateSurface(sdlWindow, instance.getInstance(), &surface)) {
+    if (!SDL_Vulkan_CreateSurface(sdlWindow, instance.getInstance(), &surface)) 
+    {
         throw std::runtime_error("Failed to create Vulkan surface!");
     }
 }
@@ -46,7 +49,8 @@ void Window::pollEvents()
 {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
-        if (event.type == SDL_QUIT) {
+        if (event.type == SDL_QUIT)
+        {
             isClosed = true;  // Set the flag when the window is closed
         }
     }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
+#include <glm/glm.hpp>
 #include <string>
 #include <vector>
 #include <memory>
@@ -11,33 +12,42 @@ class Device;
 class Swapchain;
 class Window;
 class Mesh;
+struct UboModel;
 
 class Renderer
 {
 public:
     ~Renderer();
     void setup(Device* device, Swapchain* swapchain, Window* window);
+    void finalizeSetup();
     void drawFrame();
+    void update(float deltaTime);
     void cleanup();
     
     void recreateSwapchain(VkExtent2D newExtent);
-
-    VkBuffer createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkDeviceMemory& bufferMemory);
-    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
     void addMesh(std::shared_ptr<Mesh> mesh);
 
 private:
     void createRenderPass();
+    void createDescriptorSetLayout();
     void createGraphicsPipeline();
     void createFramebuffers();
     void createCommandBuffers();
     void createSyncObjects();
+
+    void createDescriptorPool();
+    void createDescriptorSets();
+
+    void createUniformBuffers();
+    void updateUniformBuffers(uint32_t imageIndex);
     
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
     
     void cleanupSwapchain();
 
     VkPipelineShaderStageCreateInfo createShaderStage(const std::string& filepath, VkShaderStageFlagBits stage);
+
+    void allocateDynamicBufferTransferSpace();
 
     //void createVertexBuffer();
 
@@ -69,5 +79,29 @@ private:
 
 
     std::vector<std::shared_ptr<Mesh>> meshes;
+
+    // Descriptors
+    VkDescriptorSetLayout descriptorSetLayout;
+
+    VkDescriptorPool descriptorPool;
+    std::vector<VkDescriptorSet> descriptorSets;
+
+    // View Projection uniform buffer for every swapchain image
+    std::vector<VkBuffer> vpUniformBuffers;
+    std::vector<VkDeviceMemory> vpUniformBuffersMemory;
+
+    // Model dynamic uniform buffers
+    std::vector<VkBuffer> modelDynUniformBuffers;
+    std::vector<VkDeviceMemory> modelDynUniformBuffersMemory;
+
+    VkDeviceSize minUniformBufferOffset;
+    size_t modelUniformAlignment;
+
+    UboModel* modelTransferSpace;
+
+    struct UboViewProjection {
+        glm::mat4 projection;
+        glm::mat4 view;
+    } uboViewProjection;
 
 };
