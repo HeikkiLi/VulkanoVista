@@ -106,7 +106,7 @@ int Engine::initVulkan()
         glm::mat4 model = mesh->getModel().model;
         glm::vec3 offset = glm::vec3(-1.0f, 0.0f, -5.0f);
         model = glm::translate(model, offset);
-        mesh->setModel(model);
+        mesh->setModelTransform(model);
 
         // Add the mesh to the renderer
         renderer.addMesh(mesh);
@@ -125,7 +125,7 @@ int Engine::initVulkan()
         model = mesh2->getModel().model;
         offset = glm::vec3(1.0f, 0.0f, -5.0f);
         model = glm::translate(model, offset);
-        mesh2->setModel(model);
+        mesh2->setModelTransform(model);
 
         // Add the mesh to the renderer
         renderer.addMesh(mesh2);

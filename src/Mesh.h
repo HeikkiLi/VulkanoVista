@@ -7,7 +7,7 @@
 #include "Device.h"
 #include "Vertex.h"
 
-struct UboModel {
+struct Model {
     glm::mat4 model;
 };
 
@@ -17,8 +17,8 @@ public:
     Mesh(Device* device, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
     ~Mesh();
 
-    void setModel(glm::mat4 model);
-    UboModel getModel();
+    void setModelTransform(glm::mat4 transform);
+    Model getModel();
 
     void bind(VkCommandBuffer commandBuffer);
     void draw(VkCommandBuffer commandBuffer);
@@ -29,7 +29,7 @@ private:
 
     Device* device;
 
-    UboModel uboModel;
+    Model model;
 
     int vertexCount;
     VkBuffer vertexBuffer;

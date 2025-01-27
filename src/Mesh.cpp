@@ -8,7 +8,7 @@ Mesh::Mesh(Device* device, const std::vector<Vertex>& vertices, const std::vecto
     createVertexBuffer(vertices);
     createIndexBuffer(indices);
     
-    uboModel.model = glm::mat4(1.0f);
+    model.model = glm::mat4(1.0f);
 }
 
 
@@ -20,14 +20,14 @@ Mesh::~Mesh()
     vkFreeMemory(device->getLogicalDevice(), indexBufferMemory, nullptr);
 }
 
-void Mesh::setModel(glm::mat4 model)
+void Mesh::setModelTransform(glm::mat4 transform)
 {
-    uboModel.model = model;
+    model.model = transform;
 }
 
-UboModel Mesh::getModel()
+Model Mesh::getModel()
 {
-    return uboModel;
+    return model;
 }
 
 

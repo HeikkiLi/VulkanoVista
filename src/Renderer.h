@@ -12,7 +12,7 @@ class Device;
 class Swapchain;
 class Window;
 class Mesh;
-struct UboModel;
+struct Model;
 
 class Renderer
 {
@@ -30,6 +30,7 @@ public:
 private:
     void createRenderPass();
     void createDescriptorSetLayout();
+    void createPushConstantRange();
     void createGraphicsPipeline();
     void createFramebuffers();
     void createCommandBuffers();
@@ -86,6 +87,8 @@ private:
     VkDescriptorPool descriptorPool;
     std::vector<VkDescriptorSet> descriptorSets;
 
+    VkPushConstantRange pushConstantRange;
+
     // View Projection uniform buffer for every swapchain image
     std::vector<VkBuffer> vpUniformBuffers;
     std::vector<VkDeviceMemory> vpUniformBuffersMemory;
@@ -93,11 +96,10 @@ private:
     // Model dynamic uniform buffers
     std::vector<VkBuffer> modelDynUniformBuffers;
     std::vector<VkDeviceMemory> modelDynUniformBuffersMemory;
+    //VkDeviceSize minUniformBufferOffset;
+    //size_t modelUniformAlignment;
 
-    VkDeviceSize minUniformBufferOffset;
-    size_t modelUniformAlignment;
-
-    UboModel* modelTransferSpace;
+    //Model* modelTransferSpace;
 
     struct UboViewProjection {
         glm::mat4 projection;
