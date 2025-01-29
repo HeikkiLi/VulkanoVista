@@ -1,5 +1,7 @@
 #pragma once
 
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 #include <string>
@@ -32,6 +34,7 @@ private:
     void createDescriptorSetLayout();
     void createPushConstantRange();
     void createGraphicsPipeline();
+    void createDepthBufferImage();
     void createFramebuffers();
     void createCommandBuffers();
     void createSyncObjects();
@@ -49,6 +52,12 @@ private:
     VkPipelineShaderStageCreateInfo createShaderStage(const std::string& filepath, VkShaderStageFlagBits stage);
 
     void allocateDynamicBufferTransferSpace();
+
+    VkImage createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usageFlags,
+        VkMemoryPropertyFlags memoryPropertyFlags, VkDeviceMemory* imageMemory);
+    VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
+    VkFormat findDepthFormat();
+    VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 
     //void createVertexBuffer();
 
@@ -68,6 +77,11 @@ private:
     // Command buffers, one per framebuffer
     // Command buffers hold GPU commands, such as drawing calls, memory transfers, and synchronization instructions.
     std::vector<VkCommandBuffer> commandBuffers;
+
+    // Depth buffer
+    VkImage depthBufferImage;
+    VkDeviceMemory depthBufferImageMemory;
+    VkImageView depthBufferImageView;
 
     // Synchronization objects
     static const int MAX_FRAMES_IN_FLIGHT = 2;

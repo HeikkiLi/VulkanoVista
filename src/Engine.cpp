@@ -94,8 +94,8 @@ int Engine::initVulkan()
 
         std::vector<Vertex> vertices = {
            {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-           {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-           {{-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}}
+           {{0.5f, 0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+           {{-0.5f, 0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}}
         };
 
         std::vector<uint32_t> indices = { 0, 1, 2 };
@@ -104,7 +104,7 @@ int Engine::initVulkan()
         auto mesh = std::make_shared<Mesh>(&device, vertices, indices);
 
         glm::mat4 model = mesh->getModel().model;
-        glm::vec3 offset = glm::vec3(-1.0f, 0.0f, -5.0f);
+        glm::vec3 offset = glm::vec3(0.0f, 0.0f, -6.5f);
         model = glm::translate(model, offset);
         mesh->setModelTransform(model);
 
@@ -112,9 +112,9 @@ int Engine::initVulkan()
         renderer.addMesh(mesh);
 
         std::vector<Vertex> vertices2 = {
-            {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-            {{0.25f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-            {{-0.25f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}}
+            {{0.0f, -0.5f, 0.0f}, {0.0f, 1.0f, 1.0f}},
+            {{0.25f, 0.5f, 0.0f}, {0.0f, 1.0f, 1.0f}},
+            {{-0.25f, 0.5f, 0.0f}, {0.0f, 1.0f, 1.0f}}
         };
 
         std::vector<uint32_t> indices2 = { 0, 1, 2 };
@@ -123,7 +123,7 @@ int Engine::initVulkan()
         auto mesh2 = std::make_shared<Mesh>(&device, vertices2, indices2);
 
         model = mesh2->getModel().model;
-        offset = glm::vec3(1.0f, 0.0f, -5.0f);
+        offset = glm::vec3(0.0f, 0.0f, -5.0f);
         model = glm::translate(model, offset);
         mesh2->setModelTransform(model);
 
