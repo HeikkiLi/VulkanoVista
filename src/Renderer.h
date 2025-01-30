@@ -7,7 +7,10 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <unordered_map>
 
+#include "stb_image.h"
+#include "Texture.h"
 //#include "Vertex.h"
 
 class Device;
@@ -29,6 +32,9 @@ public:
     void recreateSwapchain(VkExtent2D newExtent);
     void addMesh(std::shared_ptr<Mesh> mesh);
 
+    Texture* getTexture(const std::string& texturePath);
+    void cleanupTextures();
+
 private:
     void createRenderPass();
     void createDescriptorSetLayout();
@@ -37,6 +43,7 @@ private:
     void createDepthBufferImage();
     void createFramebuffers();
     void createCommandBuffers();
+    void createTextureSampler();
     void createSyncObjects();
 
     void createDescriptorPool();
@@ -53,11 +60,19 @@ private:
 
     void allocateDynamicBufferTransferSpace();
 
-    VkImage createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usageFlags,
-        VkMemoryPropertyFlags memoryPropertyFlags, VkDeviceMemory* imageMemory);
+    void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, 
+                    VkImageUsageFlags usageFlags, VkMemoryPropertyFlags memoryPropertyFlags,
+                    VkImage* image, VkDeviceMemory* imageMemory);
     VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
     VkFormat findDepthFormat();
     VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
+
+    void loadTexture(const std::string& filePath, Texture& texture);
+    void loadTextureImage(const std::string& filePath, Texture& texture);
+
+    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+
+    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 
     //void createVertexBuffer();
 
@@ -120,4 +135,7 @@ private:
         glm::mat4 view;
     } uboViewProjection;
 
+    // Textures
+    std::unordered_map<std::string, Texture> textures;
+    VkSampler textureSampler;
 };

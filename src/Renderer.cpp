@@ -37,7 +37,7 @@ void Renderer::setup(Device* device,  Swapchain* swapchain, Window* window)
     createFramebuffers();
 
     createCommandBuffers();
-
+    createTextureSampler();
     createSyncObjects();
 
     // Set minimum uniform buffer offset
@@ -243,6 +243,32 @@ void Renderer::addMesh(std::shared_ptr<Mesh> mesh)
     meshes.push_back(mesh);
 }
 
+Texture* Renderer::getTexture(const std::string& texturePath)
+{
+    if (textures.find(texturePath) != textures.end()) 
+    {
+        // return existing texture
+        return &textures[texturePath]; 
+    }
+
+    // Load new texture
+    Texture texture;
+    loadTexture(texturePath, texture);
+    textures[texturePath] = texture;
+
+    return &textures[texturePath];
+}
+
+void Renderer::cleanupTextures() 
+{
+    for (auto& pair : textures) 
+    {
+        vkDestroyImageView(device->getLogicalDevice(), pair.second.imageView, nullptr);
+        vkDestroyImage(device->getLogicalDevice(), pair.second.image, nullptr);
+        vkFreeMemory(device->getLogicalDevice(), pair.second.memory, nullptr);
+    }
+    textures.clear();
+}
 void Renderer::cleanupSwapchain() 
 {
     // Destroy framebuffers for each swapchain image view
@@ -533,11 +559,12 @@ void Renderer::createGraphicsPipeline()
 void Renderer::createDepthBufferImage()
 {
     VkFormat depthFormat = findDepthFormat();
-    depthBufferImage = createImage(swapchain->getExtent().width, swapchain->getExtent().height,
+    createImage(swapchain->getExtent().width, swapchain->getExtent().height,
                                     depthFormat,
                                     VK_IMAGE_TILING_OPTIMAL,
                                     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
                                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                                    &depthBufferImage,
                                     &depthBufferImageMemory);
     depthBufferImageView = createImageView(depthBufferImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 }
@@ -581,6 +608,37 @@ void Renderer::createCommandBuffers()
         throw std::runtime_error("Failed to allocate command buffers!");
     }
 }
+
+void Renderer::createTextureSampler() {
+    VkPhysicalDeviceProperties properties{};
+    vkGetPhysicalDeviceProperties(device->getPhysicalDevice(), &properties);
+
+    VkSamplerCreateInfo samplerInfo{};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.anisotropyEnable = VK_TRUE;
+    samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+    samplerInfo.mipLodBias = 0.0f;
+
+    // Allocate memory for sampler
+    
+    if (vkCreateSampler(device->getLogicalDevice(), &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create texture sampler!");
+    }
+
+}
+
 
 // Create semaphores and fences for frame synchronization
 void Renderer::createSyncObjects()
@@ -818,7 +876,7 @@ void Renderer::allocateDynamicBufferTransferSpace()
     */
 }
 
-VkImage Renderer::createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usageFlags, VkMemoryPropertyFlags memoryPropertyFlags, VkDeviceMemory* imageMemory)
+void Renderer::createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usageFlags, VkMemoryPropertyFlags memoryPropertyFlags, VkImage* image, VkDeviceMemory* imageMemory)
 {
 
     VkImageCreateInfo imageInfo{};
@@ -837,14 +895,13 @@ VkImage Renderer::createImage(uint32_t width, uint32_t height, VkFormat format, 
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;      // Exclusive access, wether image can be shared between queues
 
     // Create the image
-    VkImage image;
-    if (vkCreateImage(device->getLogicalDevice(), &imageInfo, nullptr, &image) != VK_SUCCESS) {
+    if (vkCreateImage(device->getLogicalDevice(), &imageInfo, nullptr, image) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create image!");
     }
 
     // Get memory requirements
     VkMemoryRequirements memRequirements;
-    vkGetImageMemoryRequirements(device->getLogicalDevice(), image, &memRequirements);
+    vkGetImageMemoryRequirements(device->getLogicalDevice(), *image, &memRequirements);
 
     // Allocate memory
     VkMemoryAllocateInfo allocInfo{};
@@ -857,8 +914,8 @@ VkImage Renderer::createImage(uint32_t width, uint32_t height, VkFormat format, 
     }
 
     // Bind memory to the image
-    vkBindImageMemory(device->getLogicalDevice(), image, *imageMemory, 0);
-    return image;
+    vkBindImageMemory(device->getLogicalDevice(), *image, *imageMemory, 0);
+
 }
 
 VkImageView Renderer::createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags) {
@@ -913,7 +970,132 @@ VkFormat Renderer::findSupportedFormat(const std::vector<VkFormat>& candidates, 
     throw std::runtime_error("Failed to find a supported depth format!");
 }
 
+void Renderer::loadTexture(const std::string& filePath, Texture& texture)
+{
+    loadTextureImage(filePath, texture);
+    texture.imageView = createImageView(texture.image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
 
+}
+
+void Renderer::loadTextureImage(const std::string& filePath, Texture &texture)
+{
+    int texWidth, texHeight, texChannels;
+    stbi_uc* pixels = stbi_load(filePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+
+    VkDeviceSize imageSize = texWidth * texHeight * 4; // RGBA (4 bytes per pixel)
+
+    if (!pixels) 
+    {
+        throw std::runtime_error("Failed to load texture image!");
+    }
+
+    // Create staging buffer and copy image data to it
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    createBuffer(device->getLogicalDevice(), device->getPhysicalDevice(), imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        stagingBuffer, stagingBufferMemory);
+
+    void* data;
+    vkMapMemory(device->getLogicalDevice(), stagingBufferMemory, 0, imageSize, 0, &data);
+    memcpy(data, pixels, static_cast<size_t>(imageSize));
+    vkUnmapMemory(device->getLogicalDevice(), stagingBufferMemory);
+
+    stbi_image_free(pixels);
+
+    // Create Vulkan image
+    createImage(texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &texture.image, &texture.memory);
+
+    // Transition image to be ready for data copy
+    transitionImageLayout(texture.image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    
+    // Copy buffer to the new created image
+    copyBufferToImage(stagingBuffer, texture.image, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+    
+    // Transition image for shader sampling
+    transitionImageLayout(texture.image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    // Cleanup staging buffer
+    vkDestroyBuffer(device->getLogicalDevice(), stagingBuffer, nullptr);
+    vkFreeMemory(device->getLogicalDevice(), stagingBufferMemory, nullptr);
+}
+
+void Renderer::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout)
+{
+    VkCommandBuffer commandBuffer = beginCommandBuffer(device->getLogicalDevice(), device->getCommandPool());
+
+    VkImageMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = oldLayout;
+    barrier.newLayout = newLayout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = image;
+
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+
+    VkPipelineStageFlags sourceStage;
+    VkPipelineStageFlags destinationStage;
+
+    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    }
+    else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    }
+    else {
+        throw std::runtime_error("Unsupported layout transition!");
+    }
+
+    vkCmdPipelineBarrier(
+        commandBuffer,
+        sourceStage, destinationStage,
+        0, 0, nullptr, 0, nullptr, 1, &barrier
+    );
+
+    endAndSubmitCommandBuffer(device->getLogicalDevice(), device->getGraphicsQueue(), device->getCommandPool(), commandBuffer);
+}
+
+void Renderer::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
+{
+    VkCommandBuffer commandBuffer = beginCommandBuffer(device->getLogicalDevice(), device->getCommandPool());
+
+    VkBufferImageCopy region{};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+
+    region.imageOffset = { 0, 0, 0 };
+    region.imageExtent = { width, height, 1 };
+
+    vkCmdCopyBufferToImage(
+        commandBuffer,
+        buffer,
+        image,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        1,
+        &region
+    );
+
+    endAndSubmitCommandBuffer(device->getLogicalDevice(), device->getGraphicsQueue(), device->getCommandPool(), commandBuffer);
+}
 
 void Renderer::cleanup()
 {
@@ -929,6 +1111,9 @@ void Renderer::cleanup()
         vkDestroyImageView(device->getLogicalDevice(), depthBufferImageView, nullptr);
         vkDestroyImage(device->getLogicalDevice(), depthBufferImage, nullptr);
         vkFreeMemory(device->getLogicalDevice(), depthBufferImageMemory, nullptr);
+
+        cleanupTextures();
+        vkDestroySampler(device->getLogicalDevice(), textureSampler, nullptr);
 
         if (descriptorPool != VK_NULL_HANDLE) 
         {

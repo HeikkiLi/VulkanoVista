@@ -17,3 +17,7 @@ void createBuffer(VkDevice device,
     VkMemoryPropertyFlags properties,
     VkBuffer& buffer,
     VkDeviceMemory& bufferMemory);
+
+VkCommandBuffer beginCommandBuffer(VkDevice device, VkCommandPool commandPool);
+
+void endAndSubmitCommandBuffer(VkDevice device, VkQueue graphicsQueue, VkCommandPool commandPool, VkCommandBuffer commandBuffer);

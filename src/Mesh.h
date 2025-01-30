@@ -7,6 +7,9 @@
 #include "Device.h"
 #include "Vertex.h"
 
+class Renderer;
+struct Texture;
+
 struct Model {
     glm::mat4 model;
 };
@@ -14,7 +17,7 @@ struct Model {
 
 class Mesh {
 public:
-    Mesh(Device* device, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
+    Mesh(Device* device, Renderer* renderer, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, const std::string& texturePath);
     ~Mesh();
 
     void setModelTransform(glm::mat4 transform);
@@ -22,6 +25,8 @@ public:
 
     void bind(VkCommandBuffer commandBuffer);
     void draw(VkCommandBuffer commandBuffer);
+
+    Texture* getTexture() { return texture; }
 
 private:
     void createVertexBuffer(const std::vector<Vertex>& vertices);
@@ -38,4 +43,6 @@ private:
     VkBuffer indexBuffer;
     VkDeviceMemory indexBufferMemory;
     uint32_t indexCount;
+
+    Texture* texture;
 };

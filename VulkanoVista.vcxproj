@@ -166,10 +166,12 @@
     <ClInclude Include="src\Instance.h" />
     <ClInclude Include="src\Logger.h" />
     <ClInclude Include="src\Renderer.h" />
+    <ClInclude Include="src\stb_image.h" />
     <ClInclude Include="src\Swapchain.h" />
     <ClInclude Include="src\Window.h" />
     <ClInclude Include="src\Vertex.h" />
     <ClInclude Include="src\Utils.h" />
+    <ClInclude Include="src\Texture.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

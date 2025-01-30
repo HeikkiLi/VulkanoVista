@@ -101,7 +101,7 @@ int Engine::initVulkan()
         std::vector<uint32_t> indices = { 0, 1, 2 };
 
         // Create the mesh
-        auto mesh = std::make_shared<Mesh>(&device, vertices, indices);
+        auto mesh = std::make_shared<Mesh>(&device, &renderer, vertices, indices, "assets/textures/texture_07.png");
 
         glm::mat4 model = mesh->getModel().model;
         glm::vec3 offset = glm::vec3(0.0f, 0.0f, -6.5f);
@@ -120,7 +120,7 @@ int Engine::initVulkan()
         std::vector<uint32_t> indices2 = { 0, 1, 2 };
         
         // Create the mesh
-        auto mesh2 = std::make_shared<Mesh>(&device, vertices2, indices2);
+        auto  mesh2 = std::make_shared<Mesh>(&device, &renderer, vertices2, indices2, "assets/textures/texture_07.png");
 
         model = mesh2->getModel().model;
         offset = glm::vec3(0.0f, 0.0f, -5.0f);
