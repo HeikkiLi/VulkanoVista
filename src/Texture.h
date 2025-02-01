@@ -7,4 +7,5 @@ struct Texture {
     VkImage image;
     VkDeviceMemory memory;
     VkImageView imageView;
+    int textId;
 };

@@ -93,18 +93,22 @@ int Engine::initVulkan()
         renderer.setup(&device, &swapchain, &window);
 
         std::vector<Vertex> vertices = {
-           {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-           {{0.5f, 0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-           {{-0.5f, 0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}}
+           {{0.5f, -0.5f, 0.0f},    {1.0f, 0.0f, 0.0f},  {1.0f, 1.0f}},
+           {{0.5f, 0.5f, 0.0f},     {1.0f, 0.0f, 0.0f},  {1.0f, 0.0f}},
+           {{-0.5f, 0.5f, 0.0f},    {1.0f, 0.0f, 0.0f},  {0.0f, 0.0f}},
+           {{-0.5f, -0.5f, 0.0f},   {1.0f, 0.0f, 0.0f},  {0.0f, 1.0f}}
         };
 
-        std::vector<uint32_t> indices = { 0, 1, 2 };
+        std::vector<uint32_t> indices = {
+                                           0, 1, 2,
+                                           2, 3, 0
+                                        };
 
         // Create the mesh
         auto mesh = std::make_shared<Mesh>(&device, &renderer, vertices, indices, "assets/textures/texture_07.png");
 
         glm::mat4 model = mesh->getModel().model;
-        glm::vec3 offset = glm::vec3(0.0f, 0.0f, -6.5f);
+        glm::vec3 offset = glm::vec3(-2.0f, 0.0f, -6.5f);
         model = glm::translate(model, offset);
         mesh->setModelTransform(model);
 
@@ -112,18 +116,22 @@ int Engine::initVulkan()
         renderer.addMesh(mesh);
 
         std::vector<Vertex> vertices2 = {
-            {{0.0f, -0.5f, 0.0f}, {0.0f, 1.0f, 1.0f}},
-            {{0.25f, 0.5f, 0.0f}, {0.0f, 1.0f, 1.0f}},
-            {{-0.25f, 0.5f, 0.0f}, {0.0f, 1.0f, 1.0f}}
+            {{0.5f, -0.5f, 0.0f},   {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+            {{0.5f, 0.5f, 0.0f},    {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+            {{-0.5f, 0.5f, 0.0f},   {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+            {{-0.5f, -0.5f, 0.0f},  {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}}
         };
 
-        std::vector<uint32_t> indices2 = { 0, 1, 2 };
+        std::vector<uint32_t> indices2 = { 
+                                           0, 1, 2,  
+                                           2, 3, 0   
+                                         };
         
         // Create the mesh
         auto  mesh2 = std::make_shared<Mesh>(&device, &renderer, vertices2, indices2, "assets/textures/texture_07.png");
 
         model = mesh2->getModel().model;
-        offset = glm::vec3(0.0f, 0.0f, -5.0f);
+        offset = glm::vec3(2.0f, 0.0f, -5.0f);
         model = glm::translate(model, offset);
         mesh2->setModelTransform(model);
 

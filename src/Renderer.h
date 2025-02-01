@@ -46,8 +46,9 @@ private:
     void createTextureSampler();
     void createSyncObjects();
 
-    void createDescriptorPool();
+    void createDescriptorPools();
     void createDescriptorSets();
+    int createTextureDescriptor(VkImageView textureImage);
 
     void createUniformBuffers();
     void updateUniformBuffers(uint32_t imageIndex);
@@ -112,9 +113,13 @@ private:
 
     // Descriptors
     VkDescriptorSetLayout descriptorSetLayout;
-
     VkDescriptorPool descriptorPool;
-    std::vector<VkDescriptorSet> descriptorSets;
+    std::vector<VkDescriptorSet> descriptorSets; // for viewProjection one for each swapchain image
+
+    // texture sampler descriptor pool
+    VkDescriptorPool samplerDescriptorPool;
+    VkDescriptorSetLayout samplerSetLayout;
+    std::vector<VkDescriptorSet> samplerDescriptorSets;
 
     VkPushConstantRange pushConstantRange;
 
