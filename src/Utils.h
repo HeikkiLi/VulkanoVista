@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <vector>
 
-const int MAX_OBJECTS = 2;
+const int MAX_OBJECTS = 20;
 
 // Function to find a suitable memory type index
 uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties, VkPhysicalDevice physicalDevice);

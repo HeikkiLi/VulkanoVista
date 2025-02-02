@@ -13,6 +13,8 @@
 #include "Texture.h"
 //#include "Vertex.h"
 
+#include "MeshModel.h"
+
 class Device;
 class Swapchain;
 class Window;
@@ -30,10 +32,12 @@ public:
     void cleanup();
     
     void recreateSwapchain(VkExtent2D newExtent);
-    void addMesh(std::shared_ptr<Mesh> mesh);
 
     Texture* getTexture(const std::string& texturePath);
     void cleanupTextures();
+
+    int createMeshModel(std::string modelPath, std::string modelFile);
+    MeshModel& getMeshModel(size_t index) { return modelList[index]; }
 
 private:
     void createRenderPass();
@@ -49,6 +53,7 @@ private:
     void createDescriptorPools();
     void createDescriptorSets();
     int createTextureDescriptor(VkImageView textureImage);
+
 
     void createUniformBuffers();
     void updateUniformBuffers(uint32_t imageIndex);
@@ -108,9 +113,6 @@ private:
 
     std::vector<VkShaderModule> shaderModules; // To store created shader modules
 
-
-    std::vector<std::shared_ptr<Mesh>> meshes;
-
     // Descriptors
     VkDescriptorSetLayout descriptorSetLayout;
     VkDescriptorPool descriptorPool;
@@ -143,4 +145,7 @@ private:
     // Textures
     std::unordered_map<std::string, Texture> textures;
     VkSampler textureSampler;
+
+    // MeshModels
+    std::vector<MeshModel> modelList;
 };

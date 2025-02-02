@@ -92,6 +92,7 @@ int Engine::initVulkan()
         swapchain.create(&device, window.getSurface(), windowExtent);
         renderer.setup(&device, &swapchain, &window);
 
+        /*
         std::vector<Vertex> vertices = {
            {{0.5f, -0.5f, 0.0f},    {1.0f, 0.0f, 0.0f},  {1.0f, 1.0f}},
            {{0.5f, 0.5f, 0.0f},     {1.0f, 0.0f, 0.0f},  {1.0f, 0.0f}},
@@ -137,7 +138,13 @@ int Engine::initVulkan()
 
         // Add the mesh to the renderer
         renderer.addMesh(mesh2);
+        */
+        int modelIndex = renderer.createMeshModel("assets/Crate/", "Crate1.obj");
 
+        MeshModel meshModel = renderer.getMeshModel(modelIndex);
+        glm::vec3 offset(0.0f, 0.0f, -3.0f);
+        renderer.getMeshModel(modelIndex).setModel(glm::translate(meshModel.getModel().model, offset));
+       
         renderer.finalizeSetup();
     }
     catch (std::runtime_error& e) {

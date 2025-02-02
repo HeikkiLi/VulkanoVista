@@ -17,8 +17,10 @@ struct Model {
 
 class Mesh {
 public:
-    Mesh(Device* device, Renderer* renderer, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, const std::string& texturePath);
+    Mesh(Device* device, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, const int textureId);
     ~Mesh();
+
+    void destroyBuffers();
 
     void setModelTransform(glm::mat4 transform);
     Model getModel();
@@ -26,7 +28,8 @@ public:
     void bind(VkCommandBuffer commandBuffer);
     void draw(VkCommandBuffer commandBuffer);
 
-    Texture* getTexture() { return texture; }
+    int getTextId() { return textId; }
+    //Texture* getTexture() { return texture; }
 
 private:
     void createVertexBuffer(const std::vector<Vertex>& vertices);
@@ -36,7 +39,7 @@ private:
 
     Model model;
 
-    int vertexCount;
+    uint32_t vertexCount;
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
 
@@ -44,5 +47,6 @@ private:
     VkDeviceMemory indexBufferMemory;
     uint32_t indexCount;
 
-    Texture* texture;
+    int textId;
+    //Texture* texture;
 };

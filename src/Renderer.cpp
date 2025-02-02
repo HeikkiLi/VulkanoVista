@@ -7,6 +7,10 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+
 #include "Utils.h"
 #include "Device.h"
 #include "Swapchain.h"
@@ -52,7 +56,7 @@ void Renderer::setup(Device* device,  Swapchain* swapchain, Window* window)
 
     // view projection
     uboViewProjection.projection = glm::perspective(glm::radians(45.0f), (float)swapchain->getExtent().width / (float)swapchain->getExtent().height, 0.1f, 100.0f);
-    uboViewProjection.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    uboViewProjection.view = glm::lookAt(glm::vec3(2.5f, 3.0f, 10.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     uboViewProjection.projection[1][1] *= -1;
 
     createUniformBuffers();
@@ -144,14 +148,14 @@ void Renderer::update(float deltaTime)
     // Calculate rotation angle in radians based on deltaTime
     float rotationAngle = glm::radians(rotationSpeed * deltaTime);
 
-    for (size_t i = 0; i < meshes.size(); i++)
+    for (size_t i = 0; i < modelList.size(); i++)
     {
-        glm::mat4 model = meshes[i]->getModel().model;
+        glm::mat4 model = modelList[i].getModel().model;
 
         float direction = (i == 0) ? -1.0f : 1.0f;
-        model = glm::rotate(model, rotationAngle * direction, glm::vec3(0.0f, 0.0f, 1.0f));
+        model = glm::rotate(model, rotationAngle * direction, glm::vec3(0.0f, 1.0f, 0.0f));
 
-        meshes[i]->setModelTransform(model);
+        modelList[i].setModel(model);
     }
 }
 
@@ -188,18 +192,12 @@ void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
     // Bind graphics pipeline
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
     
-    // Iterate over all meshes and draw them
-    for (size_t i = 0; i < meshes.size(); i++) 
+    // Iterate over all models and draw them
+    for (size_t i = 0; i < modelList.size(); i++) 
     {
-
-        // Bind mesh index and vertex buffers       
-        meshes[i]->bind(commandBuffer);
-
-        // Dynamic offset amount
-        //uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment) * i;
-
         // push constants to given shader.
-        Model model = meshes[i]->getModel();
+        MeshModel meshModel = modelList[i];
+        Model model = meshModel.getModel();
         vkCmdPushConstants(commandBuffer,
             pipelineLayout,
             VK_SHADER_STAGE_VERTEX_BIT,
@@ -207,17 +205,27 @@ void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
             sizeof(Model),
             &model);
 
-        std::array<VkDescriptorSet, 2> descriptorSetGroup = {
-                                                            descriptorSets[imageIndex],
-                                                            samplerDescriptorSets[meshes[i]->getTexture()->textId]
-                                                        };
+        for (size_t j = 0; j < meshModel.getMeshCount(); ++j)
+        {
 
-        // bind descriptor sets
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-            0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 0, nullptr);
+            // Bind mesh index and vertex buffers       
+            meshModel.getMesh(j)->bind(commandBuffer);
+
+            // Dynamic offset amount
+            //uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment) * i;
+
+            std::array<VkDescriptorSet, 2> descriptorSetGroup = {
+                                                                descriptorSets[imageIndex],
+                                                                samplerDescriptorSets[meshModel.getMesh(j)->getTextId()]
+            };
+
+            // bind descriptor sets
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+                0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 0, nullptr);
 
 
-        meshes[i]->draw(commandBuffer);  // Issue indexed draw call
+            meshModel.getMesh(j)->draw(commandBuffer);  // Issue indexed draw call
+        }
     }
 
     vkCmdEndRenderPass(commandBuffer);
@@ -242,11 +250,6 @@ void Renderer::recreateSwapchain(VkExtent2D windowExtent)
     createGraphicsPipeline();
     createFramebuffers();
     createCommandBuffers();
-}
-
-void Renderer::addMesh(std::shared_ptr<Mesh> mesh) 
-{
-    meshes.push_back(mesh);
 }
 
 Texture* Renderer::getTexture(const std::string& texturePath)
@@ -838,6 +841,41 @@ int Renderer::createTextureDescriptor(VkImageView textureImage)
     return samplerDescriptorSets.size() - 1;
 }
 
+int Renderer::createMeshModel(std::string modelPath, std::string modelFile)
+{
+    Assimp::Importer importer;
+    const aiScene* scene = importer.ReadFile(modelPath + modelFile, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_JoinIdenticalVertices);
+
+    if (!scene)
+    {
+        throw std::runtime_error("Failed to load model! (" + modelPath + modelFile +")");
+    }
+
+    std::vector<std::string> textureNames = MeshModel::loadMaterials(scene);
+
+    // Create textures
+    std::vector<int> matToTex(textureNames.size());
+    for (size_t i = 0; i < textureNames.size(); ++i)
+    {
+        if (textureNames[i].empty())
+        {
+            matToTex[i] = 0;
+        }
+        else
+        {
+            Texture* texture = getTexture(modelPath + textureNames[i]);
+            matToTex[i] = texture->textId;
+        }
+    }
+
+    // Load all the meshes
+    std::vector<Mesh> modelMeshes = MeshModel::LoadNode(device, scene->mRootNode, scene, matToTex);
+
+    MeshModel meshModel = MeshModel(modelMeshes);
+    modelList.push_back(meshModel);
+    return modelList.size() - 1;
+}
+
 void Renderer::createUniformBuffers()
 {
     // viewProjection buffer size.
@@ -1187,6 +1225,12 @@ void Renderer::cleanup()
 
     if (device)
     {
+        vkDeviceWaitIdle(device->getLogicalDevice());
+
+        for (size_t i = 0; i < modelList.size(); ++i)
+        {
+            modelList[i].destroyMeshModel();
+        }
 
         vkDestroyDescriptorPool(device->getLogicalDevice(), samplerDescriptorPool, nullptr);
         vkDestroyDescriptorSetLayout(device->getLogicalDevice(), samplerSetLayout, nullptr);
@@ -1330,12 +1374,6 @@ void Renderer::cleanup()
             }
         }
         shaderModules.clear();
-
-        for (auto& mesh : meshes) 
-        {
-            mesh.reset();
-        }
-        meshes.clear();
 
         this->device = nullptr;
     }
