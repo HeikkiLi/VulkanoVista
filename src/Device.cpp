@@ -237,6 +237,7 @@ void Device::createLogicalDevice(VkSurfaceKHR surface)
     // physical device features logical device will use.
     VkPhysicalDeviceFeatures deviceFeatures = {};
     vkGetPhysicalDeviceFeatures(physicalDevice, &deviceFeatures);
+    deviceFeatures.samplerAnisotropy = VK_TRUE;
 
     VkDeviceCreateInfo deviceCreateInfo = {};
     deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;

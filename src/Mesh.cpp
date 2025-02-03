@@ -1,35 +1,42 @@
 #include "Mesh.h"
 
+#include "Renderer.h"
 #include "Utils.h"
 
-Mesh::Mesh(Device* device, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices)
+Mesh::Mesh(Device* device, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, const int textureId)
     : device(device), vertexBuffer(VK_NULL_HANDLE), vertexBufferMemory(VK_NULL_HANDLE),
-    indexBuffer(VK_NULL_HANDLE), indexBufferMemory(VK_NULL_HANDLE), indexCount(indices.size()), vertexCount(vertices.size()) {
+    indexBuffer(VK_NULL_HANDLE), indexBufferMemory(VK_NULL_HANDLE), indexCount(indices.size()), vertexCount(vertices.size()), textId(textureId) {
     createVertexBuffer(vertices);
     createIndexBuffer(indices);
     
-    uboModel.model = glm::mat4(1.0f);
+    model.model = glm::mat4(1.0f);
+    //texture = renderer->getTexture(texturePath);
 }
-
 
 Mesh::~Mesh() 
 {
-    vkDestroyBuffer(device->getLogicalDevice(), vertexBuffer, nullptr);
-    vkFreeMemory(device->getLogicalDevice(), vertexBufferMemory, nullptr);
-    vkDestroyBuffer(device->getLogicalDevice(), indexBuffer, nullptr);
-    vkFreeMemory(device->getLogicalDevice(), indexBufferMemory, nullptr);
 }
 
-void Mesh::setModel(glm::mat4 model)
+void Mesh::destroyBuffers()
 {
-    uboModel.model = model;
+    if (device)
+    {
+        vkDestroyBuffer(device->getLogicalDevice(), vertexBuffer, nullptr);
+        vkFreeMemory(device->getLogicalDevice(), vertexBufferMemory, nullptr);
+        vkDestroyBuffer(device->getLogicalDevice(), indexBuffer, nullptr);
+        vkFreeMemory(device->getLogicalDevice(), indexBufferMemory, nullptr);
+    }
 }
 
-UboModel Mesh::getModel()
+void Mesh::setModelTransform(glm::mat4 transform)
 {
-    return uboModel;
+    model.model = transform;
 }
 
+Model Mesh::getModel()
+{
+    return model;
+}
 
 void Mesh::createVertexBuffer(const std::vector<Vertex>& vertices) 
 {

@@ -92,44 +92,59 @@ int Engine::initVulkan()
         swapchain.create(&device, window.getSurface(), windowExtent);
         renderer.setup(&device, &swapchain, &window);
 
+        /*
         std::vector<Vertex> vertices = {
-           {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-           {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-           {{-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}}
+           {{0.5f, -0.5f, 0.0f},    {1.0f, 0.0f, 0.0f},  {1.0f, 1.0f}},
+           {{0.5f, 0.5f, 0.0f},     {1.0f, 0.0f, 0.0f},  {1.0f, 0.0f}},
+           {{-0.5f, 0.5f, 0.0f},    {1.0f, 0.0f, 0.0f},  {0.0f, 0.0f}},
+           {{-0.5f, -0.5f, 0.0f},   {1.0f, 0.0f, 0.0f},  {0.0f, 1.0f}}
         };
 
-        std::vector<uint32_t> indices = { 0, 1, 2 };
+        std::vector<uint32_t> indices = {
+                                           0, 1, 2,
+                                           2, 3, 0
+                                        };
 
         // Create the mesh
-        auto mesh = std::make_shared<Mesh>(&device, vertices, indices);
+        auto mesh = std::make_shared<Mesh>(&device, &renderer, vertices, indices, "assets/textures/texture_07.png");
 
         glm::mat4 model = mesh->getModel().model;
-        glm::vec3 offset = glm::vec3(-1.0f, 0.0f, -5.0f);
+        glm::vec3 offset = glm::vec3(-2.0f, 0.0f, -6.5f);
         model = glm::translate(model, offset);
-        mesh->setModel(model);
+        mesh->setModelTransform(model);
 
         // Add the mesh to the renderer
         renderer.addMesh(mesh);
 
         std::vector<Vertex> vertices2 = {
-            {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-            {{0.25f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-            {{-0.25f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}}
+            {{0.5f, -0.5f, 0.0f},   {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+            {{0.5f, 0.5f, 0.0f},    {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+            {{-0.5f, 0.5f, 0.0f},   {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+            {{-0.5f, -0.5f, 0.0f},  {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}}
         };
 
-        std::vector<uint32_t> indices2 = { 0, 1, 2 };
+        std::vector<uint32_t> indices2 = { 
+                                           0, 1, 2,  
+                                           2, 3, 0   
+                                         };
         
         // Create the mesh
-        auto mesh2 = std::make_shared<Mesh>(&device, vertices2, indices2);
+        auto  mesh2 = std::make_shared<Mesh>(&device, &renderer, vertices2, indices2, "assets/textures/texture_07.png");
 
         model = mesh2->getModel().model;
-        offset = glm::vec3(1.0f, 0.0f, -5.0f);
+        offset = glm::vec3(2.0f, 0.0f, -5.0f);
         model = glm::translate(model, offset);
-        mesh2->setModel(model);
+        mesh2->setModelTransform(model);
 
         // Add the mesh to the renderer
         renderer.addMesh(mesh2);
+        */
+        int modelIndex = renderer.createMeshModel("assets/Crate/", "Crate1.obj");
 
+        MeshModel meshModel = renderer.getMeshModel(modelIndex);
+        glm::vec3 offset(0.0f, 0.0f, -3.0f);
+        renderer.getMeshModel(modelIndex).setModel(glm::translate(meshModel.getModel().model, offset));
+       
         renderer.finalizeSetup();
     }
     catch (std::runtime_error& e) {

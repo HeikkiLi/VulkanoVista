@@ -1,18 +1,25 @@
 #pragma once
 
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 #include <string>
 #include <vector>
 #include <memory>
+#include <unordered_map>
 
+#include "stb_image.h"
+#include "Texture.h"
 //#include "Vertex.h"
+
+#include "MeshModel.h"
 
 class Device;
 class Swapchain;
 class Window;
 class Mesh;
-struct UboModel;
+struct Model;
 
 class Renderer
 {
@@ -25,18 +32,28 @@ public:
     void cleanup();
     
     void recreateSwapchain(VkExtent2D newExtent);
-    void addMesh(std::shared_ptr<Mesh> mesh);
+
+    Texture* getTexture(const std::string& texturePath);
+    void cleanupTextures();
+
+    int createMeshModel(std::string modelPath, std::string modelFile);
+    MeshModel& getMeshModel(size_t index) { return modelList[index]; }
 
 private:
     void createRenderPass();
     void createDescriptorSetLayout();
+    void createPushConstantRange();
     void createGraphicsPipeline();
+    void createDepthBufferImage();
     void createFramebuffers();
     void createCommandBuffers();
+    void createTextureSampler();
     void createSyncObjects();
 
-    void createDescriptorPool();
+    void createDescriptorPools();
     void createDescriptorSets();
+    int createTextureDescriptor(VkImageView textureImage);
+
 
     void createUniformBuffers();
     void updateUniformBuffers(uint32_t imageIndex);
@@ -48,6 +65,20 @@ private:
     VkPipelineShaderStageCreateInfo createShaderStage(const std::string& filepath, VkShaderStageFlagBits stage);
 
     void allocateDynamicBufferTransferSpace();
+
+    void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, 
+                    VkImageUsageFlags usageFlags, VkMemoryPropertyFlags memoryPropertyFlags,
+                    VkImage* image, VkDeviceMemory* imageMemory);
+    VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
+    VkFormat findDepthFormat();
+    VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
+
+    void loadTexture(const std::string& filePath, Texture& texture);
+    void loadTextureImage(const std::string& filePath, Texture& texture);
+
+    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+
+    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 
     //void createVertexBuffer();
 
@@ -68,6 +99,11 @@ private:
     // Command buffers hold GPU commands, such as drawing calls, memory transfers, and synchronization instructions.
     std::vector<VkCommandBuffer> commandBuffers;
 
+    // Depth buffer
+    VkImage depthBufferImage;
+    VkDeviceMemory depthBufferImageMemory;
+    VkImageView depthBufferImageView;
+
     // Synchronization objects
     static const int MAX_FRAMES_IN_FLIGHT = 2;
     std::vector<VkSemaphore> imageAvailableSemaphores;
@@ -77,14 +113,17 @@ private:
 
     std::vector<VkShaderModule> shaderModules; // To store created shader modules
 
-
-    std::vector<std::shared_ptr<Mesh>> meshes;
-
     // Descriptors
     VkDescriptorSetLayout descriptorSetLayout;
-
     VkDescriptorPool descriptorPool;
-    std::vector<VkDescriptorSet> descriptorSets;
+    std::vector<VkDescriptorSet> descriptorSets; // for viewProjection one for each swapchain image
+
+    // texture sampler descriptor pool
+    VkDescriptorPool samplerDescriptorPool;
+    VkDescriptorSetLayout samplerSetLayout;
+    std::vector<VkDescriptorSet> samplerDescriptorSets;
+
+    VkPushConstantRange pushConstantRange;
 
     // View Projection uniform buffer for every swapchain image
     std::vector<VkBuffer> vpUniformBuffers;
@@ -93,15 +132,20 @@ private:
     // Model dynamic uniform buffers
     std::vector<VkBuffer> modelDynUniformBuffers;
     std::vector<VkDeviceMemory> modelDynUniformBuffersMemory;
+    //VkDeviceSize minUniformBufferOffset;
+    //size_t modelUniformAlignment;
 
-    VkDeviceSize minUniformBufferOffset;
-    size_t modelUniformAlignment;
-
-    UboModel* modelTransferSpace;
+    //Model* modelTransferSpace;
 
     struct UboViewProjection {
         glm::mat4 projection;
         glm::mat4 view;
     } uboViewProjection;
 
+    // Textures
+    std::unordered_map<std::string, Texture> textures;
+    VkSampler textureSampler;
+
+    // MeshModels
+    std::vector<MeshModel> modelList;
 };

@@ -2,12 +2,15 @@
 *.o
 
 # Executable Files
-SDL2VulkanGame
-SDL2VulkanGame.exe
+VulkanoVista
+VulkanoVista.exe
 
-# Build Directories
-/build/
-obj/
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
 
 # Build results
 [Dd]ebug/
@@ -25,11 +28,11 @@ bld/
 [Ll]og/
 [Ll]ogs/
 
-# Visual Studio files
-*.sln
-*.vcxproj
-*.vcxproj.filters
-*.vcxproj.user
+# Visual Studio 2015/2017 cache/options directory
+.vs/
+
+# Visual Studio 2017 auto generated files
+Generated\ Files/
 
 # CMake Cache and Configuration Files (if used)
 CMakeCache.txt

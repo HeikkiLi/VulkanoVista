@@ -7,21 +7,29 @@
 #include "Device.h"
 #include "Vertex.h"
 
-struct UboModel {
+class Renderer;
+struct Texture;
+
+struct Model {
     glm::mat4 model;
 };
 
 
 class Mesh {
 public:
-    Mesh(Device* device, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
+    Mesh(Device* device, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, const int textureId);
     ~Mesh();
 
-    void setModel(glm::mat4 model);
-    UboModel getModel();
+    void destroyBuffers();
+
+    void setModelTransform(glm::mat4 transform);
+    Model getModel();
 
     void bind(VkCommandBuffer commandBuffer);
     void draw(VkCommandBuffer commandBuffer);
+
+    int getTextId() { return textId; }
+    //Texture* getTexture() { return texture; }
 
 private:
     void createVertexBuffer(const std::vector<Vertex>& vertices);
@@ -29,13 +37,16 @@ private:
 
     Device* device;
 
-    UboModel uboModel;
+    Model model;
 
-    int vertexCount;
+    uint32_t vertexCount;
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
 
     VkBuffer indexBuffer;
     VkDeviceMemory indexBufferMemory;
     uint32_t indexCount;
+
+    int textId;
+    //Texture* texture;
 };
