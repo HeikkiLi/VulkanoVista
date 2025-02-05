@@ -8,6 +8,9 @@ Some of the key Vulkan features implemented:
 * depth buffer
 * second sub pass
 * textures and mesh rendering
+  
+<img src="https://github.com/user-attachments/assets/0182032e-b0cb-4e1d-a2b6-03411b94bf9b" width="50%">
+
 
 ## Prerequisites
 
