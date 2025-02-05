@@ -44,6 +44,7 @@ private:
     void createDescriptorSetLayout();
     void createPushConstantRange();
     void createGraphicsPipeline();
+    void createColorBufferImage();
     void createDepthBufferImage();
     void createFramebuffers();
     void createCommandBuffers();
@@ -52,6 +53,7 @@ private:
 
     void createDescriptorPools();
     void createDescriptorSets();
+    void createInputDescriptorSets();
     int createTextureDescriptor(VkImageView textureImage);
 
 
@@ -71,6 +73,7 @@ private:
                     VkImage* image, VkDeviceMemory* imageMemory);
     VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
     VkFormat findDepthFormat();
+    VkFormat findColorFormat();
     VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 
     void loadTexture(const std::string& filePath, Texture& texture);
@@ -92,6 +95,10 @@ private:
     VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
     VkPipeline graphicsPipeline = VK_NULL_HANDLE;
 
+    // second pass pipeline
+    VkPipelineLayout secondPipelineLayout = VK_NULL_HANDLE;
+    VkPipeline secondPipeline = VK_NULL_HANDLE;
+
     // Framebuffers for each swapchain image
     std::vector<VkFramebuffer> framebuffers;
 
@@ -99,10 +106,21 @@ private:
     // Command buffers hold GPU commands, such as drawing calls, memory transfers, and synchronization instructions.
     std::vector<VkCommandBuffer> commandBuffers;
 
+
+    //-------------------------------------------------
+    // Buffers for sub passes
+
+    // Color buffer image
+    std::vector<VkImage> colorBufferImages;
+    std::vector<VkDeviceMemory> colorBufferImageMemory;
+    std::vector<VkImageView> colorBufferImageViews;
+
     // Depth buffer
-    VkImage depthBufferImage;
-    VkDeviceMemory depthBufferImageMemory;
-    VkImageView depthBufferImageView;
+    std::vector<VkImage> depthBufferImages;
+    std::vector<VkDeviceMemory> depthBufferImageMemory;
+    std::vector<VkImageView> depthBufferImageViews;
+
+    //-----------------------------------------------
 
     // Synchronization objects
     static const int MAX_FRAMES_IN_FLIGHT = 2;
@@ -117,6 +135,10 @@ private:
     VkDescriptorSetLayout descriptorSetLayout;
     VkDescriptorPool descriptorPool;
     std::vector<VkDescriptorSet> descriptorSets; // for viewProjection one for each swapchain image
+
+    VkDescriptorSetLayout inputSetLayout;
+    VkDescriptorPool inputDescriptorPool;
+    std::vector<VkDescriptorSet> inputDescriptorSets;
 
     // texture sampler descriptor pool
     VkDescriptorPool samplerDescriptorPool;
