@@ -1,13 +1,11 @@
 # VulkanoVista
-Vulkan based rendering project that uses **SDL2** for window management, **GLM** for math operations, and **Assimp** for model loading.
-Some of the key Vulkan features implemented:
-* swapchain
-* render pipeline
-* descriptor sets and uniform buffers
-* push constants
-* depth buffer
-* second sub pass
-* textures and mesh rendering
+A simple Vulkan-based rendering project for learning and experimentation.
+
+This project uses SDL2 for window management, GLM for math operations, and Assimp for model loading. It implements basic rendering features such as:
+* Swapchain & render pipeline
+* Descriptor sets & uniform buffers
+* Depth buffering & multi-pass rendering
+* Basic texture and mesh rendering
   
 <img src="https://github.com/user-attachments/assets/0182032e-b0cb-4e1d-a2b6-03411b94bf9b" width="50%">
 
