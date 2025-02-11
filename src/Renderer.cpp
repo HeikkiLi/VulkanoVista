@@ -61,7 +61,12 @@ void Renderer::setup(Device* device,  Swapchain* swapchain, Window* window)
 
     // view projection
     uboViewProjection.projection = glm::perspective(glm::radians(45.0f), (float)swapchain->getExtent().width / (float)swapchain->getExtent().height, 0.1f, 100.0f);
-    uboViewProjection.view = glm::lookAt(glm::vec3(0.0f, 3.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    
+    uboViewProjection.view = glm::lookAt(
+        glm::vec3(0.0f, 3.0f, 5.0f),  
+        glm::vec3(0.0f, 1.0f, 0.0f),   
+        glm::vec3(0.0f, 1.0f, 0.0f)
+    );
     uboViewProjection.projection[1][1] *= -1;
 
     createUniformBuffers();
