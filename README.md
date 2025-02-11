@@ -7,7 +7,10 @@ This project uses SDL2 for window management, GLM for math operations, and Assim
 * Depth buffering & multi-pass rendering
 * Basic texture and mesh rendering
   
-<img src="https://github.com/user-attachments/assets/0182032e-b0cb-4e1d-a2b6-03411b94bf9b" width="50%">
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/0182032e-b0cb-4e1d-a2b6-03411b94bf9b" width="45%">
+  <img src="https://github.com/user-attachments/assets/c4fd0e5c-f65b-4e91-bc13-15c00ff7f490" width="45%">
+</p>
 
 
 ## Prerequisites
