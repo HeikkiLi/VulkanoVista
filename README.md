@@ -8,9 +8,10 @@ This project uses SDL3 for window management, Dear ImGui for UI, GLM for math op
 * Basic texture and mesh rendering
   
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/0182032e-b0cb-4e1d-a2b6-03411b94bf9b" width="45%">
-  <img src="https://github.com/user-attachments/assets/c4fd0e5c-f65b-4e91-bc13-15c00ff7f490" width="45%">
+  <img src="https://github.com/user-attachments/assets/32b163c2-0bfe-49ce-b954-42868394b62f" width="45%">
+  <img src="https://github.com/user-attachments/assets/d6a011b0-ba63-4037-8d41-8be73df4d92c" width="45%">
 </p>
+
 
 
 ## **Dependencies**
