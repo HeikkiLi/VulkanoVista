@@ -6,6 +6,7 @@ This project uses SDL3 for window management, Dear ImGui for UI, GLM for math op
 * Descriptor sets & uniform buffers
 * Depth buffering & multi-pass rendering
 * Basic texture and mesh rendering
+* Model loading with assimp
   
 <p align="center">
   <img src="https://github.com/user-attachments/assets/32b163c2-0bfe-49ce-b954-42868394b62f" width="45%">
@@ -38,13 +39,13 @@ Clone & Install vcpkg:
 
 Install Dependencies:
 ```sh
-    vcpkg install sdl3[x64-windows] glm[x64-windows] imgui[x64-windows] assimp[x64-windows]
+    vcpkg install assimp[x64-windows]
 ```
 
 ### **4. Required Packages (Linux)**
 Install:
 ```sh
-    sudo apt install libvulkan-dev libsdl2-dev libglm-dev libassimp-dev libglfw3-dev
+    sudo apt install libvulkan-dev libassimp-dev
 ```
 
 
@@ -83,7 +84,8 @@ git submodule update --init --recursive
 ```
 /VulkanoVista
 ├── src/            # Source files
-├── external/       # External libraries (assimp include and lib etc.)
+├── build/          # build build binaries and files from CMake build
+├── external/       # External libraries (glm, sdl, etc submodules and external build files)
 ├── assets/         # Models & textures
 ├── shaders/        # Shaders and shader build scripts
 └── README.md       # This file
