@@ -6,8 +6,8 @@
 #include "Swapchain.h"
 #include "Renderer.h"
 
-const int WIDTH = 800;
-const int HEIGHT = 600;
+const int WIDTH = 1280;
+const int HEIGHT = 720;
 
 class Engine 
 {
@@ -32,5 +32,4 @@ private:
 
     int initWindow();
     int initVulkan();
-
 };

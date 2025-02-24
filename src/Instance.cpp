@@ -14,20 +14,16 @@ Instance::~Instance()
 
 std::vector<const char*> Instance::getRequiredExtensions(SDL_Window* window)
 {
-    unsigned extensionCount = 0;
-    if (!SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, nullptr)) 
+    Uint32 extensionCount = 0;
+    const char *const  *extensions = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
+
+    if (extensions == nullptr) 
     {
-        Logger::error("Could not get the number of required instance extensions from SDL.");
-        throw std::runtime_error("Failed to get SDL Vulkan extensions.");
+        throw std::runtime_error("Failed to get Vulkan extensions");
     }
 
-    std::vector<const char*> extensions(extensionCount);
-    if (!SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, extensions.data())) 
-    {
-        Logger::error("Could not get the names of required instance extensions from SDL.");
-        throw std::runtime_error("Failed to get SDL Vulkan extensions.");
-    }
-    return extensions;
+    std::vector<const char*> extensionList(extensions, extensions + extensionCount);
+    return extensionList;
 }
 
 std::vector<const char*> Instance::getValidationLayers() 

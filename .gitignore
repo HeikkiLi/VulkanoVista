@@ -12,6 +12,14 @@ VulkanoVista.exe
 *.userosscache
 *.sln.docstates
 
+# Build directories
+[Cc]MakeFiles/
+CMakeCache.txt
+CMakeLists.txt.user
+cmake_install.cmake
+Makefile
+Makefile.user
+
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/
@@ -27,6 +35,12 @@ bld/
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
+build/
+
+# Visual Studio generated files
+.vs2019/
+.vs2017/
+.vs2015/
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/
@@ -65,4 +79,8 @@ CMakeFiles/
 .DS_Store
 Thumbs.db
 
-external/
+
+# Ignore Visual Studio solution and project files
+*.sln
+*.vcxproj
+*.vcxproj.filters

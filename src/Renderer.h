@@ -14,18 +14,25 @@
 //#include "Vertex.h"
 
 #include "MeshModel.h"
+#include "ImGuiManager.h"
 
 class Device;
 class Swapchain;
 class Window;
+class Instance;
 class Mesh;
 struct Model;
+
+struct FrameStats {
+    float fps = 0.0f;
+    float mspf = 0.0f; // milliseconds per frame
+};
 
 class Renderer
 {
 public:
     ~Renderer();
-    void setup(Device* device, Swapchain* swapchain, Window* window);
+    void setup(Device* device, Swapchain* swapchain, Window* window, Instance* instance);
     void finalizeSetup();
     void drawFrame();
     void update(float deltaTime);
@@ -38,6 +45,7 @@ public:
 
     int createMeshModel(std::string modelPath, std::string modelFile);
     MeshModel& getMeshModel(size_t index) { return modelList[index]; }
+    VkRenderPass getRenderPass() { return renderPass; }
 
 private:
     void createRenderPass();
@@ -56,12 +64,9 @@ private:
     void createInputDescriptorSets();
     int createTextureDescriptor(VkImageView textureImage);
 
-
     void createUniformBuffers();
     void updateUniformBuffers(uint32_t imageIndex);
-    
-    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
-    
+      
     void cleanupSwapchain();
 
     VkPipelineShaderStageCreateInfo createShaderStage(const std::string& filepath, VkShaderStageFlagBits stage);
@@ -83,12 +88,22 @@ private:
 
     void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 
-    //void createVertexBuffer();
+    // init ImGui manager
+    int initImGui();
+
+
+    void calcFrameStats(float deltaTime);
+
+    //--------------------------------------------------------------------------------
+    // Render Frame methods
+    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+    VkCommandBuffer getCurrentCommandBuffer() const;
 
     // Reference to external objects (set in setup)
     Device* device = nullptr;       // Pointer to Device for easy access
     Swapchain* swapchain = nullptr; // Pointer to Swapchain for easy access
     Window* window = nullptr;
+    Instance* instance = nullptr;
 
     // Vulkan resources
     VkRenderPass renderPass = VK_NULL_HANDLE;
@@ -170,4 +185,10 @@ private:
 
     // MeshModels
     std::vector<MeshModel> modelList;
+    float rotation = 0.0f;
+
+    // ImGuiManager
+    ImGuiManager* imguiManager = nullptr;
+
+    FrameStats frameStats;
 };

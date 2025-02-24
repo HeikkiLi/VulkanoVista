@@ -25,11 +25,12 @@ Renderer::~Renderer()
     cleanup();
 }
 
-void Renderer::setup(Device* device,  Swapchain* swapchain, Window* window)
+void Renderer::setup(Device* device,  Swapchain* swapchain, Window* window, Instance* instance)
 {
     this->device = device;          // Store pointer to Device
     this->swapchain = swapchain;    // Store pointer to Swapchain
     this->window = window;          // and window..
+    this->instance = instance;
 
     device->createCommandPool();
 
@@ -73,6 +74,11 @@ void Renderer::setup(Device* device,  Swapchain* swapchain, Window* window)
     createDescriptorPools();
     createDescriptorSets();
     createInputDescriptorSets();
+
+    if (initImGui() == EXIT_FAILURE)
+    {
+        throw std::runtime_error("Failed to init ImGui!");
+    }
 }
 
 void Renderer::finalizeSetup()
@@ -81,31 +87,25 @@ void Renderer::finalizeSetup()
     //createDescriptorSets();
 }
 
-// Acquire image from swapchain, record command buffer, submit, and present
+
 void Renderer::drawFrame()
 {
-    // wait for fences to signal (open) from last draw
+
     vkWaitForFences(device->getLogicalDevice(), 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
-    // close fences
     vkResetFences(device->getLogicalDevice(), 1, &inFlightFences[currentFrame]);
 
-
-    // Acquire an image from the swapchain
     uint32_t imageIndex;
-    VkResult result = vkAcquireNextImageKHR(device->getLogicalDevice(), swapchain->getSwapchain(), UINT64_MAX,
-        imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+    VkResult result = vkAcquireNextImageKHR(device->getLogicalDevice(), swapchain->getSwapchain(), UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        recreateSwapchain(window->getExtent());  // If the swapchain is outdated, recreate it.
+        recreateSwapchain(swapchain->getExtent());
         return;
     }
     else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
         throw std::runtime_error("Failed to acquire swap chain image!");
     }
 
-    updateUniformBuffers(imageIndex);
-
     // Record commands to command buffer (for this specific image)
-    vkResetCommandBuffer(commandBuffers[imageIndex], 0);
+    updateUniformBuffers(imageIndex);
     recordCommandBuffer(commandBuffers[imageIndex], imageIndex);
 
     // Set up submit info for queue submission
@@ -154,35 +154,59 @@ void Renderer::drawFrame()
 
 void Renderer::update(float deltaTime) 
 {
-    const float rotationSpeed = 45.0f; // Rotate 45 degrees per second
-
-    // Calculate rotation angle in radians based on deltaTime
-    float rotationAngle = glm::radians(rotationSpeed * deltaTime);
+    calcFrameStats(deltaTime);
 
     for (size_t i = 0; i < modelList.size(); i++)
     {
-        glm::mat4 model = modelList[i].getModel().model;
+        glm::mat4 originalModel  = modelList[i].getModel().model;
+
+        glm::vec3 position = glm::vec3(originalModel[3]); 
+        glm::vec3 scale = glm::vec3(
+            glm::length(glm::vec3(originalModel[0])),  // X scale
+            glm::length(glm::vec3(originalModel[1])),  // Y scale
+            glm::length(glm::vec3(originalModel[2]))   // Z scale
+        );
 
         float direction = (i == 0) ? -1.0f : 1.0f;
-        model = glm::rotate(model, rotationAngle * direction, glm::vec3(0.0f, 1.0f, 0.0f));
 
-        //modelList[i].setModel(model);
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, position);  // Keep original position
+        model = glm::rotate(model, glm::radians(rotation * direction), glm::vec3(0.0f, 1.0f, 0.0f)); // Apply rotation
+        model = glm::scale(model, scale); // Keep original scale
+        modelList[i].setModel(model);
     }
 }
 
+void Renderer::calcFrameStats(float deltaTime)
+{
+    static float elapsedTime = 0.0f;
+    static int frameCount = 0;
 
+    elapsedTime += deltaTime;
+    frameCount++;
 
-void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) 
+    // Update stats every 1 second
+    if (elapsedTime >= 1.0f) 
+    {
+        frameStats.fps = static_cast<float>(frameCount) / elapsedTime;
+        frameStats.mspf = (elapsedTime * 1000.0f) / frameCount;
+
+        frameCount = 0;
+        elapsedTime = 0.0f;
+    }
+}
+
+void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
 {
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-
+    
     if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) 
     {
         throw std::runtime_error("Failed to begin command buffer!");
     }
-
+    
     // Render pass begin
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -240,6 +264,23 @@ void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
         }
     }
 
+    // Start ImGui frame
+    imguiManager->beginFrame();
+
+    // Render ImGui UI
+    ImGui::Begin("Vulkan Engine");
+    ImGui::Text("Hello from ImGui!");
+    ImGui::SliderFloat("rotation", &rotation, 0.0f, 360.0f, "%.1f");
+    ImGui::End();
+
+    ImGui::Begin("Framerate", 0, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar);
+    ImGui::SetWindowSize(ImVec2(200, 30));
+    ImGui::SetWindowPos(ImVec2(2, 2));
+    ImGui::Text("%.3f ms/frame (%.1f FPS)", frameStats.mspf, frameStats.fps);
+    ImGui::End();
+
+    imguiManager->endFrame(commandBuffer);
+
     // start second subpass
     vkCmdNextSubpass(commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -248,7 +289,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
         0, 1, &inputDescriptorSets[imageIndex], 0, nullptr);
     vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 
-
+    // end the render pass
     vkCmdEndRenderPass(commandBuffer);
 
     if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
@@ -390,12 +431,17 @@ void Renderer::cleanupSwapchain()
         commandBuffers.clear();
     }
 
-    // Call the swapchain’s own cleanup function to destroy swapchain and associated image views
+    // Call the swapchainï¿½s own cleanup function to destroy swapchain and associated image views
     if (swapchain != nullptr) {
         swapchain->cleanup();
     }
 }
 
+
+VkCommandBuffer Renderer::getCurrentCommandBuffer() const
+{
+    return commandBuffers[currentFrame];
+}
 
 // Create the render pass
 void Renderer::createRenderPass()
@@ -1460,6 +1506,25 @@ void Renderer::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width,
     endAndSubmitCommandBuffer(device->getLogicalDevice(), device->getGraphicsQueue(), device->getCommandPool(), commandBuffer);
 }
 
+int Renderer::initImGui()
+{
+    try {
+        imguiManager = new ImGuiManager(window->getSDLWindow(),
+            instance->getInstance(),
+            device->getLogicalDevice(),
+            device->getPhysicalDevice(),
+            device->getGraphicsQueue(),
+            device->getGraphicsQueueFamilyIndex(),
+            getRenderPass());
+
+    }
+    catch (std::runtime_error& e) {
+        Logger::error("Failed to initialize ImGui: " + std::string(e.what()));
+        return EXIT_FAILURE;
+    }
+    return 0;
+}
+
 VkFormat Renderer::findColorFormat()
 {
     return findSupportedFormat(
@@ -1476,6 +1541,13 @@ void Renderer::cleanup()
     //    _aligned_free(modelTransferSpace);
     //    modelTransferSpace = nullptr;
     //}
+
+
+    if (imguiManager)
+    {
+        delete imguiManager;
+        imguiManager = nullptr;
+    }
 
     if (device)
     {

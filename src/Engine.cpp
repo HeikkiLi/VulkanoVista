@@ -19,6 +19,7 @@ int Engine::init()
         return EXIT_FAILURE;
     }
 
+
     return 0;
 }
 
@@ -26,10 +27,14 @@ void Engine::run()
 {
     auto lastTime = std::chrono::high_resolution_clock::now();
 
-    while (!window.shouldClose()) {
+    while (!window.shouldClose()) 
+    {
         SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_RESIZED) {
+        while (SDL_PollEvent(&event))
+        {
+            ImGui_ImplSDL3_ProcessEvent(&event); // Process ImGui input
+            if (event.type == SDL_EVENT_WINDOW_RESIZED) 
+            {
                 VkExtent2D newExtent = window.getExtent();
                 renderer.recreateSwapchain(newExtent);
             }
@@ -39,11 +44,13 @@ void Engine::run()
         auto currentTime = std::chrono::high_resolution_clock::now();
         float deltaTime = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - lastTime).count();
         lastTime = currentTime;
-
+ 
         // Update the renderer
         renderer.update(deltaTime);
 
+        // Draw frame
         renderer.drawFrame();
+
     }
     device.waitIdle();
 }
@@ -52,18 +59,10 @@ void Engine::run()
 void Engine::cleanup()
 {
     swapchain.cleanup();  // Clean up swapchain resources first.
-
-    // Clean up renderer resources 
-    renderer.cleanup();
-
-    // Clean up device-specific resources like buffers, memory, etc.
-    device.cleanup();
-
-    // Clean up the Vulkan instance.
-    instance.cleanup();
-
-    // Clean up window
-    window.cleanup();
+    renderer.cleanup();   // Clean up renderer resources
+    device.cleanup();     // Clean up device resources
+    instance.cleanup();   // Clean up Vulkan instance
+    window.cleanup();     // Clean up window
 }
 
 int Engine::initWindow()
@@ -90,7 +89,7 @@ int Engine::initVulkan()
         device.pickPhysicalDevice(instance, window.getSurface());
         device.createLogicalDevice(window.getSurface());
         swapchain.create(&device, window.getSurface(), windowExtent);
-        renderer.setup(&device, &swapchain, &window);
+        renderer.setup(&device, &swapchain, &window, &instance);
 
         //int modelIndex = renderer.createMeshModel("assets/Crate/", "Crate1.obj");
         int modelIndex = renderer.createMeshModel("assets/teapot/", "teapot.obj");
