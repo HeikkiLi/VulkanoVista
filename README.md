@@ -6,13 +6,11 @@ This project uses SDL3 for window management, Dear ImGui for UI, GLM for math op
 * Descriptor sets & uniform buffers
 * Depth buffering & multi-pass rendering
 * Basic texture and mesh rendering
-* Model loading with assimp
   
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/32b163c2-0bfe-49ce-b954-42868394b62f" width="45%">
-  <img src="https://github.com/user-attachments/assets/d6a011b0-ba63-4037-8d41-8be73df4d92c" width="45%">
+  <img src="https://github.com/user-attachments/assets/0182032e-b0cb-4e1d-a2b6-03411b94bf9b" width="45%">
+  <img src="https://github.com/user-attachments/assets/c4fd0e5c-f65b-4e91-bc13-15c00ff7f490" width="45%">
 </p>
-
 
 
 ## **Dependencies**
@@ -39,13 +37,13 @@ Clone & Install vcpkg:
 
 Install Dependencies:
 ```sh
-    vcpkg install assimp[x64-windows]
+    vcpkg install sdl3[x64-windows] glm[x64-windows] imgui[x64-windows] assimp[x64-windows]
 ```
 
 ### **4. Required Packages (Linux)**
 Install:
 ```sh
-    sudo apt install libvulkan-dev libassimp-dev
+    sudo apt install libvulkan-dev libsdl2-dev libglm-dev libassimp-dev libglfw3-dev
 ```
 
 
@@ -84,8 +82,7 @@ git submodule update --init --recursive
 ```
 /VulkanoVista
 ├── src/            # Source files
-├── build/          # build build binaries and files from CMake build
-├── external/       # External libraries (glm, sdl, etc submodules and external build files)
+├── external/       # External libraries (assimp include and lib etc.)
 ├── assets/         # Models & textures
 ├── shaders/        # Shaders and shader build scripts
 └── README.md       # This file

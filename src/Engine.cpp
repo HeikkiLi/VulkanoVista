@@ -91,15 +91,15 @@ int Engine::initVulkan()
         swapchain.create(&device, window.getSurface(), windowExtent);
         renderer.setup(&device, &swapchain, &window, &instance);
 
-        //int modelIndex = renderer.createMeshModel("assets/Crate/", "Crate1.obj");
-        int modelIndex = renderer.createMeshModel("assets/teapot/", "teapot.obj");
+        int modelIndex = renderer.createMeshModel("assets/Crate/", "Crate1.obj");
+        //int modelIndex = renderer.createMeshModel("assets/teapot/", "teapot.obj");
 
         
         MeshModel meshModel = renderer.getMeshModel(modelIndex);
-        glm::vec3 offset(0.0f, -60.0f, -150.0f);
+        glm::vec3 offset(0.0f, 0.0f, -1.0f);
         float rotationAngle = glm::radians(-45.0f);
-        glm::vec3 scale(0.1f, 0.1f, 0.1f);
-        meshModel.setModel(glm::scale(meshModel.getModel().model, scale));
+        //glm::vec3 scale(0.1f, 0.1f, 0.1f);
+        //meshModel.setModel(glm::scale(meshModel.getModel().model, scale));
         meshModel.setModel(glm::translate(meshModel.getModel().model, offset));
         meshModel.setModel(glm::rotate(meshModel.getModel().model, rotationAngle, glm::vec3(0.0f, 1.0f, 0.0f)));
         
