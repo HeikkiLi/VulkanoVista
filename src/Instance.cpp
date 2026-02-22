@@ -17,8 +17,7 @@ std::vector<const char*> Instance::getRequiredExtensions(SDL_Window* window)
     Uint32 extensionCount = 0;
     const char *const  *extensions = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
 
-    if (extensions == nullptr) 
-    {
+    if (extensions == nullptr) {
         throw std::runtime_error("Failed to get Vulkan extensions");
     }
 

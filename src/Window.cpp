@@ -20,8 +20,7 @@ void Window::create(int width, int height, const std::string& title)
         throw std::runtime_error("Failed to initialize SDL");
     }
 
-    if (!SDL_Vulkan_LoadLibrary(nullptr)) 
-    {
+    if (!SDL_Vulkan_LoadLibrary(nullptr)) {
         Logger::error("Failed to load Vulkan library: " + std::string(SDL_GetError()));
         throw std::runtime_error("Failed to load Vulkan library");
     }

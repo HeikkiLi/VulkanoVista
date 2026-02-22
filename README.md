@@ -57,8 +57,8 @@ cmake --build build --config Release
 
 ## Linux
 ```sh
-cmake -B build -S .
-cmake --build build --config Release
+cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+cmake --build build
 ```
 
 # Running the Application

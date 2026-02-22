@@ -65,6 +65,7 @@ private:
     };
 
     bool isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface);
+    int rateDeviceSuitability(VkPhysicalDevice device, VkSurfaceKHR surface);
     bool isSwapchainExtensionSupported(VkPhysicalDevice physicalDevice);
     bool checkDeviceExtensionSupport(VkPhysicalDevice device);
     SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface);

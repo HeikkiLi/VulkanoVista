@@ -154,45 +154,19 @@ void Renderer::drawFrame()
 
 void Renderer::update(float deltaTime) 
 {
-    calcFrameStats(deltaTime);
+    const float rotationSpeed = 45.0f; // Rotate 45 degrees per second
+
+    // Calculate rotation angle in radians based on deltaTime
+    float rotationAngle = glm::radians(rotationSpeed * deltaTime);
 
     for (size_t i = 0; i < modelList.size(); i++)
     {
-        glm::mat4 originalModel  = modelList[i].getModel().model;
-
-        glm::vec3 position = glm::vec3(originalModel[3]); 
-        glm::vec3 scale = glm::vec3(
-            glm::length(glm::vec3(originalModel[0])),  // X scale
-            glm::length(glm::vec3(originalModel[1])),  // Y scale
-            glm::length(glm::vec3(originalModel[2]))   // Z scale
-        );
+        glm::mat4 model = modelList[i].getModel().model;
 
         float direction = (i == 0) ? -1.0f : 1.0f;
+        model = glm::rotate(model, rotationAngle * direction, glm::vec3(0.0f, 1.0f, 0.0f));
 
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, position);  // Keep original position
-        model = glm::rotate(model, glm::radians(rotation * direction), glm::vec3(0.0f, 1.0f, 0.0f)); // Apply rotation
-        model = glm::scale(model, scale); // Keep original scale
-        modelList[i].setModel(model);
-    }
-}
-
-void Renderer::calcFrameStats(float deltaTime)
-{
-    static float elapsedTime = 0.0f;
-    static int frameCount = 0;
-
-    elapsedTime += deltaTime;
-    frameCount++;
-
-    // Update stats every 1 second
-    if (elapsedTime >= 1.0f) 
-    {
-        frameStats.fps = static_cast<float>(frameCount) / elapsedTime;
-        frameStats.mspf = (elapsedTime * 1000.0f) / frameCount;
-
-        frameCount = 0;
-        elapsedTime = 0.0f;
+        //modelList[i].setModel(model);
     }
 }
 
@@ -270,14 +244,12 @@ void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
     // Render ImGui UI
     ImGui::Begin("Vulkan Engine");
     ImGui::Text("Hello from ImGui!");
-    ImGui::SliderFloat("rotation", &rotation, 0.0f, 360.0f, "%.1f");
+    float speed = 2.0f;
+    ImGui::SliderFloat("Camera Speed", &speed, 0.1f, 10.0f);
     ImGui::End();
 
-    ImGui::Begin("Framerate", 0, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar);
-    ImGui::SetWindowSize(ImVec2(200, 30));
-    ImGui::SetWindowPos(ImVec2(2, 2));
-    ImGui::Text("%.3f ms/frame (%.1f FPS)", frameStats.mspf, frameStats.fps);
-    ImGui::End();
+    // Draw the shader editor UI
+    imguiManager->drawShaderEditor();
 
     imguiManager->endFrame(commandBuffer);
 
@@ -431,7 +403,7 @@ void Renderer::cleanupSwapchain()
         commandBuffers.clear();
     }
 
-    // Call the swapchainï¿½s own cleanup function to destroy swapchain and associated image views
+    // Call the swapchain’s own cleanup function to destroy swapchain and associated image views
     if (swapchain != nullptr) {
         swapchain->cleanup();
     }

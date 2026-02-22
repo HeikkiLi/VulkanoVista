@@ -53,6 +53,8 @@ ImGuiManager::ImGuiManager(SDL_Window* window, VkInstance instance, VkDevice dev
 
     ImGui_ImplVulkan_Init(&init_info);
 
+    initTextEditor(); // Initialize shader editor
+
     initialized = true;
 }
 
@@ -83,4 +85,51 @@ void ImGuiManager::endFrame(VkCommandBuffer commandBuffer)
     if (!initialized) return;
     ImGui::Render();
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+}
+
+void ImGuiManager::initTextEditor()
+{
+    //shaderEditor.SetLanguageDefinition(TextEditor::LanguageDefinition::GLSL()); // GLSL syntax
+    //shaderEditor.SetText("#version 450\nvoid main() {}"); // Default shader code
+}
+
+void ImGuiManager::drawShaderEditor()
+{
+    ImGui::SetNextWindowSize(ImVec2(600, 400), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowBgAlpha(0.9f); // Semi-transparent
+
+    ImGui::Begin("Shader Editor", nullptr, ImGuiWindowFlags_NoCollapse);
+
+    // Render the text editor
+    //shaderEditor.Render("GLSL Editor");
+
+    // Buttons for Save/Load
+    if (ImGui::Button("Save"))
+    {
+        saveShaderToFile("shader.glsl");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Load")) 
+    {
+        loadShaderFromFile("shader.glsl");
+    }
+
+    ImGui::End();
+}
+
+void ImGuiManager::saveShaderToFile(const std::string& filename)
+{
+    //std::ofstream out(filename);
+    //if (out.is_open())
+   //     out << shaderEditor.GetText();
+}
+
+void ImGuiManager::loadShaderFromFile(const std::string& filename)
+{
+    //std::ifstream in(filename);
+    //if (in.is_open()) 
+    //{
+      //  std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+      //  shaderEditor.SetText(content);
+    //}
 }

@@ -23,11 +23,6 @@ class Instance;
 class Mesh;
 struct Model;
 
-struct FrameStats {
-    float fps = 0.0f;
-    float mspf = 0.0f; // milliseconds per frame
-};
-
 class Renderer
 {
 public:
@@ -90,9 +85,6 @@ private:
 
     // init ImGui manager
     int initImGui();
-
-
-    void calcFrameStats(float deltaTime);
 
     //--------------------------------------------------------------------------------
     // Render Frame methods
@@ -185,10 +177,7 @@ private:
 
     // MeshModels
     std::vector<MeshModel> modelList;
-    float rotation = 0.0f;
 
     // ImGuiManager
     ImGuiManager* imguiManager = nullptr;
-
-    FrameStats frameStats;
 };

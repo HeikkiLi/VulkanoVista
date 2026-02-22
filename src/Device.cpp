@@ -3,12 +3,12 @@
 #include "Mesh.h"
 
 
-void Device::pickPhysicalDevice(const Instance& instance, VkSurfaceKHR surface) 
+void Device::pickPhysicalDevice(const Instance& instance, VkSurfaceKHR surface)
 {
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(instance.getInstance(), &deviceCount, nullptr);
 
-    if (deviceCount == 0) 
+    if (deviceCount == 0)
     {
         throw std::runtime_error("Failed to find GPUs with Vulkan support!");
     }
@@ -16,27 +16,42 @@ void Device::pickPhysicalDevice(const Instance& instance, VkSurfaceKHR surface)
     std::vector<VkPhysicalDevice> devices(deviceCount);
     vkEnumeratePhysicalDevices(instance.getInstance(), &deviceCount, devices.data());
 
-    for (const auto& device : devices) 
+    int bestScore = 0;
+    VkPhysicalDevice bestDevice = VK_NULL_HANDLE;
+
+    for (const auto& dev : devices)
     {
         VkPhysicalDeviceProperties deviceProperties;
-        vkGetPhysicalDeviceProperties(device, &deviceProperties);
+        vkGetPhysicalDeviceProperties(dev, &deviceProperties);
 
         Logger::info("Device Name: " + std::string(deviceProperties.deviceName));
         Logger::info("Device Type: " + std::to_string(static_cast<int>(deviceProperties.deviceType)));
 
-        if (isDeviceSuitable(device, surface)) 
+        int score = rateDeviceSuitability(dev, surface);
+
+        Logger::info("  Score: " + std::to_string(score));
+
+        if (score > bestScore)
         {
-            physicalDevice = device;
-            Logger::info("Selected Device : " + std::string(deviceProperties.deviceName));
-            graphicsQueueFamilyIndex = findQueueFamilies(physicalDevice, surface).graphicsFamily.value();
-            break;
+            bestScore = score;
+            bestDevice = dev;
         }
     }
 
-    if (physicalDevice == VK_NULL_HANDLE) 
+    if (bestDevice == VK_NULL_HANDLE)
     {
+        Logger::error("No suitable GPU found after scoring.");
         throw std::runtime_error("Failed to find a suitable GPU!");
     }
+
+    // assign chosen device and the graphics queue family index
+    physicalDevice = bestDevice;
+    VkPhysicalDeviceProperties chosenProps;
+    vkGetPhysicalDeviceProperties(physicalDevice, &chosenProps);
+    Logger::info("Selected Device : " + std::string(chosenProps.deviceName));
+
+    // get graphicsQueueFamilyIndex (we assume findQueueFamilies will return a valid index now)
+    graphicsQueueFamilyIndex = findQueueFamilies(physicalDevice, surface).graphicsFamily.value();
 }
 
 VkPhysicalDevice Device::getPhysicalDevice() const
@@ -52,21 +67,83 @@ bool Device::isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface)
     VkPhysicalDeviceFeatures deviceFeatures;
     vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
 
-    // Check for graphics queue family support
     QueueFamilyIndices indices = findQueueFamilies(device, surface);
+    bool indicesComplete = indices.isComplete();
+
     bool extensionsSupported = checkDeviceExtensionSupport(device);
 
     bool swapChainAdequate = false;
+    SwapChainSupportDetails swapChainSupport;
     if (extensionsSupported)
     {
-        SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device, surface);
+        swapChainSupport = querySwapChainSupport(device, surface);
         swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
     }
 
-    // Prefer a discrete GPU, though an integrated GPU will also work
-    bool isDiscreteGPU = deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+    bool isRealGpu = deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ||
+                     deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU ||
+                     deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU ||
+                     deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_OTHER;
 
-    return indices.isComplete() && extensionsSupported && swapChainAdequate && isDiscreteGPU && deviceFeatures.geometryShader;
+    bool supportsGeometry = deviceFeatures.geometryShader;
+
+    // Diagnostic logging so you can see why a device was rejected
+    std::string name = deviceProperties.deviceName;
+    Logger::info("Evaluating device: " + name);
+    Logger::info("  Device type: " + std::to_string(static_cast<int>(deviceProperties.deviceType)));
+    Logger::info("  Queue families complete: " + std::string(indicesComplete ? "yes" : "no"));
+    Logger::info("  Extensions supported: " + std::string(extensionsSupported ? "yes" : "no"));
+    if (extensionsSupported) {
+        Logger::info("  Swapchain formats: " + std::to_string(swapChainSupport.formats.size()));
+        Logger::info("  Swapchain presentModes: " + std::to_string(swapChainSupport.presentModes.size()));
+    }
+    Logger::info("  Geometry shader: " + std::string(supportsGeometry ? "yes" : "no"));
+
+    // Final decision: accept any real GPU that passed the above checks.
+    // NOTE: we do not require geometry shader here — enable that check only if you need it.
+    bool suitable = indicesComplete && extensionsSupported && swapChainAdequate && isRealGpu; // && supportsGeometry;
+
+    Logger::info("  -> Suitable: " + std::string(suitable ? "YES" : "NO"));
+    return suitable;
+}
+
+int Device::rateDeviceSuitability(VkPhysicalDevice device, VkSurfaceKHR surface)
+{
+    VkPhysicalDeviceProperties props;
+    vkGetPhysicalDeviceProperties(device, &props);
+
+    VkPhysicalDeviceFeatures feats;
+    vkGetPhysicalDeviceFeatures(device, &feats);
+
+    // Basic suitability checks
+    QueueFamilyIndices indices = findQueueFamilies(device, surface);
+    if (!indices.isComplete()) return 0;
+
+    if (!checkDeviceExtensionSupport(device)) return 0;
+
+    SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device, surface);
+    if (swapChainSupport.formats.empty() || swapChainSupport.presentModes.empty()) return 0;
+
+    // If geometry shader is required by your app, uncomment this:
+    // if (!feats.geometryShader) return 0;
+
+    int score = 0;
+
+    // Prefer discrete > integrated > virtual/other
+    if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) score += 2000;
+    else if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) score += 1000;
+    else if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU) score += 500;
+    else score += 100;
+
+    // Add some weight from device limits (approximate "power")
+    score += static_cast<int>(props.limits.maxImageDimension2D / 1024);
+
+    // If you want to prefer devices with samplerAnisotropy:
+    VkPhysicalDeviceFeatures featsQuery;
+    vkGetPhysicalDeviceFeatures(device, &featsQuery);
+    if (featsQuery.samplerAnisotropy) score += 50;
+
+    return score;
 }
 
 QueueFamilyIndices Device::findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface)

@@ -20,6 +20,12 @@ public:
     void beginFrame();
     void endFrame(VkCommandBuffer commandBuffer);
 
+    // Shader Editor UI
+    void initTextEditor();
+    void drawShaderEditor();
+    void saveShaderToFile(const std::string& filename);
+    void loadShaderFromFile(const std::string& filename);
+
 private:
     bool initialized = false;
 
@@ -27,5 +33,6 @@ private:
     VkDevice device;
     VkInstance instance;
     VkDescriptorPool descriptorPool;
+
 };
 
